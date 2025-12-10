@@ -1,4 +1,11 @@
 venv/
+.venv/
 *__pycache__*
+.idea/
 .env
 .vscode/
+.tool-versions
+*.Identifier
+models/*
+data/*
+output/

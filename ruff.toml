@@ -1,0 +1,85 @@
+line-length = 120
+
+[lint]
+select = [
+    "E",  # pycodestyle - error
+    "W",  # pycodestyle - warning
+    "D", # pydocstyle
+    "F",  # Pyflakes
+    "PL", # PyLint
+    "UP",  # pyupgrade
+    "N", # pep-8 naming
+    "I",  # isort
+    "PERF", # Perflint
+
+    # --- flake-8 ---
+    "ARG", # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "A", # flake8-builtins
+    "C4", # flake8-comprehensions
+    "ANN", # flake8-annotations
+    "PYI", # flake8-pyi
+    "FBT", # flake8-boolean-trap
+    "PT", # flake8-pytest-style
+    "ISC", # flake8-implicit-str-concat
+    "ICN", # flake8-import-conventions
+    "PIE", # flake8-pie
+    "T20", # flake8-print
+    "RET", # flake8-return
+    "TID", # flake8-tidy-imports
+    "TCH", # flake8-type-checking
+    "DJ", # flake8-django
+    "B", # flake8-bugbear
+]
+
+ignore = [
+    "E501", # line-too-long
+    "E203", # whitespace-before-punctuation
+    "ISC001", # single-line-implicit-string-concatenation
+
+    # --- Docstring ---
+    "D100", # undocumented-public-module
+    "D203", # one-blank-line-before-class
+    "D212", # multi-line-summary-first-line
+    "D401", # non-imperative-mood
+    "D205", # blank-line-after-summary
+    "D107", # undocumented-public-init
+
+    "ANN002", #Missing type annotation for `*args`
+    "ANN003", # missing type annotation for **kwargs
+    "ANN204", # Missing return type annotation for special method `__init__`
+    "PLR2004", # magic-value-comparision
+
+    "PLR0913",   # Too many arguments in function definition (6 > 5)
+    "FBT001", # Boolean-typed positional argument in function definition
+    "FBT002", # Boolean default positional argument in function definition
+]
+
+extend-safe-fixes = ["C", "D", "A", "W291"]
+
+[lint.extend-per-file-ignores]
+"**/__init__.py" = ["D"]
+"tests/test_*.py" = ["D", "ANN201"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+exclude = [
+    # Rules conflicting with the linter
+    "E111",  # indentation-with-invalid-multiple
+    "E114",  # indentation-with-invalid-multiple-comment
+    "E117",  # over-indented
+    "D300",  # triple-single-quotes
+    "Q000",  # bad-quotes-inline-string
+    "Q001",  # bad-quotes-multiline-string
+    "Q002",  # bad-quotes-docstring
+    "Q003",  # avoidable-escaped-quote
+    "COM812",  # missing-trailing-comma
+    "COM819",  # prohibited-trailing-comma
+    "ISC001",  # single-line-implicit-string-concatenation
+    "ISC002",   # multi-line-implicit-string-concatenation
+
+    # we sometimes mount docker volumes here, causing permission problems
+    "data/"
+]
