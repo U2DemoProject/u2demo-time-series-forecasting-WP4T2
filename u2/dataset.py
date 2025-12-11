@@ -61,7 +61,7 @@ class U2TimeSeriesPredictionDataset:
         self.final_timestamp = None
 
     @classmethod
-    def from_csv(
+    def from_csv(  # noqa: PLR0912
         cls,
         time_series_csv: str,
         min_num_rows_per_group: int,
@@ -118,16 +118,22 @@ class U2TimeSeriesPredictionDataset:
         obj = cls()
         obj.df = pd.read_csv(time_series_csv, *args, **kwargs)
 
-        # Force timestamp column to datetime type
-        obj.df[timestamp_col_name] = pd.to_datetime(obj.df[timestamp_col_name])
+        obj.min_num_rows_per_group = min_num_rows_per_group
 
         if (
             timestamp_col_name not in obj.df.columns
             or predict_value_col_name not in obj.df.columns
             or location_col_name not in obj.df.columns
         ):
-            error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` and/or `{location_col_name}` columns are missing`."
+            error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` and/or `{location_col_name}` columns are missing."
             raise AttributeError(error)
+
+        if obj.df.isna().any().any():
+            error = "The input data contains NaN values."
+            raise ValueError(error)
+
+        # Force timestamp column to datetime type
+        obj.df[timestamp_col_name] = pd.to_datetime(obj.df[timestamp_col_name])
 
         if group_col_name not in obj.df.columns:
             logger.warning(
@@ -135,20 +141,7 @@ class U2TimeSeriesPredictionDataset:
             )
             obj.df[group_col_name] = 0
 
-        # Drop groups with too few rows
-        counts = obj.df[group_col_name].value_counts()
-        dropped = counts[counts < min_num_rows_per_group].index.tolist()
-        if dropped:
-            logger.warning(
-                f"The following groups were dropped because they have too few rows to predict on (<{min_num_rows_per_group}):"
-            )
-            for d in dropped:
-                logger.warning(f"\t{d}")
-            obj.df = obj.df[obj.df[group_col_name].map(counts) >= min_num_rows_per_group]
-        if obj.df.empty:
-            error = "No group in the input CSV has enough rows to predict on."
-            logger.error(error)
-            raise ValueError(error)
+        obj.drop_short_groups(group_col_name)
 
         # All groups must have the same final timestamp
         final_timestamps = set(obj.df.groupby(group_col_name)[timestamp_col_name].max().to_list())
@@ -189,6 +182,46 @@ class U2TimeSeriesPredictionDataset:
         obj.df = obj.df.sort_values([DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME])
 
         return obj
+
+    def drop_short_groups(self, group_col_name: str) -> None:
+        """
+        Drop groups from the dataset that do not have enough rows for prediction.
+
+        For each group in the specified column:
+        - Counts the number of rows per group
+        - Identifies groups with fewer rows than `self.min_num_rows_per_group`
+        - Logs a warning listing the dropped groups
+        - Removes rows belonging to these short groups from `self.df`
+        - Raises a ValueError if no groups remain after filtering
+
+        Parameters
+        ----------
+        group_col_name : str
+            Name of the column containing the groups to evaluate.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If no group has enough rows to predict on.
+
+        """
+        counts = self.df[group_col_name].value_counts()
+        dropped = counts[counts < self.min_num_rows_per_group].index.tolist()
+        if dropped:
+            logger.warning(
+                f"The following groups were dropped because they have too few rows to predict on (<{self.min_num_rows_per_group}):"
+            )
+            for d in dropped:
+                logger.warning(f"\t{d}")
+            self.df = self.df[self.df[group_col_name].map(counts) >= self.min_num_rows_per_group]
+        if self.df.empty:
+            error = "No group in the input CSV has enough rows to predict on."
+            logger.error(error)
+            raise ValueError(error)
 
     def extend_by_horizon(self, horizon: int) -> None:
         """
@@ -320,6 +353,7 @@ class U2TimeSeriesPredictionDataset:
             lag_gen.create_lag_features(col, lags=lags)
             lag_gen.create_rolling_stat_features(col, windows=windows)
         self.df, self.added_columns["lag"] = lag_gen.finalize()
+        self.drop_short_groups(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME)
 
     def add_holidays(self) -> None:
         """

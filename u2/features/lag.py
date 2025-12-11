@@ -47,7 +47,7 @@ class LagFeatureGenerator:
         self._max_shift = 0
         self.added_columns = []
 
-    def create_lag_features(self, column: str, lags: list[int]) -> pd.DataFrame:
+    def create_lag_features(self, column: str, lags: list[int]) -> None:
         """
         Create lag features for a given column within each timeseries group.
 
@@ -61,24 +61,20 @@ class LagFeatureGenerator:
         lags : list[int]
             List of integer lag steps (e.g., [1, 24, 48]).
 
-        Returns
-        -------
-        pandas.DataFrame
-            The updated DataFrame with newly added lag features.
-
         Notes
         -----
         Updates the internal `_max_shift` to ensure proper trimming in `finalize()`.
 
         """
-        for lag in lags:
-            lag_column_name = f"lag_{lag}"
-            self.df[lag_column_name] = self.df.groupby(self.group_name)[column].shift(lag)
-            self.added_columns.append(lag_column_name)
+        if lags != []:
+            for lag in lags:
+                lag_column_name = f"lag_{lag}"
+                self.df[lag_column_name] = self.df.groupby(self.group_name)[column].shift(lag)
+                self.added_columns.append(lag_column_name)
 
-        self._max_shift = max(self._max_shift, int(max(lags)))
+            self._max_shift = max(self._max_shift, int(max(lags)))
 
-    def create_rolling_stat_features(self, column: str, windows: list, statistics: list[str] = None) -> pd.DataFrame:
+    def create_rolling_stat_features(self, column: str, windows: list, statistics: list[str] = None) -> None:
         """
         Create rolling statistical features (mean, std, min, max) for a column.
 
@@ -94,11 +90,6 @@ class LagFeatureGenerator:
             List of rolling window sizes.
         statistics : list[str], optional
             List of statistics to compute. Defaults to ["mean", "std", "min", "max"].
-
-        Returns
-        -------
-        pandas.DataFrame
-            The updated DataFrame with added rolling feature columns.
 
         Raises
         ------
