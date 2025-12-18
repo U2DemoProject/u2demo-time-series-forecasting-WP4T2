@@ -11,8 +11,8 @@ import pytest
 
 from u2.dataset import U2TimeSeriesPredictionDataset
 from u2.defaults import (
-    DEFAULT_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
+    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
@@ -35,9 +35,9 @@ class TestU2TimeSeriesPredictionDataset:
             ("csv_with_nan_values", pytest.raises(ValueError, match="The input data contains NaN values.")),
             (
                 "csv_short_periods",
-                pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
+                does_not_raise(),
             ),
-            ("csv_empty", pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on.")),
+            ("csv_empty", pytest.raises(ValueError, match="The input data is empty.")),
             (
                 "csv_other_columns",
                 pytest.raises(
@@ -54,20 +54,16 @@ class TestU2TimeSeriesPredictionDataset:
         request: pytest.FixtureRequest,
     ) -> None:
         """Test loading dataset from all CSV fixtures with expected outcomes."""
-        # Get the actual CSV path from the fixture
         csv_path = request.getfixturevalue(csv_fixture)
 
         with expectation:
-            dataset = U2TimeSeriesPredictionDataset.from_csv(
-                csv_path,
-                min_num_rows_per_group=10,
-            )
+            dataset = U2TimeSeriesPredictionDataset.from_csv(csv_path)
 
             assert dataset.df is not None
             assert DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME in dataset.df.columns
             assert DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME in dataset.df.columns
             assert DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME in dataset.df.columns
-            assert DEFAULT_LOCATION_COLUMN_NAME in dataset.df.columns
+            assert DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in dataset.df.columns
 
     def test_from_csv_custom_columns(self, csv_other_columns: str) -> None:
         """Test loading dataset from CSV with custom column names."""
@@ -77,22 +73,52 @@ class TestU2TimeSeriesPredictionDataset:
             predict_value_col_name="energy",
             group_col_name="asset_name",
             location_col_name="site",
-            min_num_rows_per_group=10,
         )
 
         assert dataset.df is not None
         assert DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME in dataset.df.columns
         assert DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME in dataset.df.columns
         assert DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME in dataset.df.columns
-        assert DEFAULT_LOCATION_COLUMN_NAME in dataset.df.columns
+        assert DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in dataset.df.columns
+
+    @pytest.mark.parametrize(
+        ("csv_fixture", "min_group_length", "expectation"),
+        [
+            ("csv_multiple_groups", 98, does_not_raise()),
+            (
+                "csv_multiple_groups",
+                101,
+                pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
+            ),
+            (
+                "csv_short_periods",
+                4,
+                does_not_raise(),
+            ),
+            (
+                "csv_short_periods",
+                6,
+                pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
+            ),
+        ],
+    )
+    def test_drop_short_groups(
+        self,
+        csv_fixture: str,
+        min_group_length: int,
+        expectation: AbstractContextManager,
+        request: pytest.FixtureRequest,
+    ):
+        csv_path = request.getfixturevalue(csv_fixture)
+
+        with expectation:
+            dataset = U2TimeSeriesPredictionDataset.from_csv(csv_path)
+            dataset.drop_short_groups(min_group_length)
 
     @pytest.mark.parametrize(("horizon"), [1, 24, 72])
     def test_extend_by_horizon(self, csv_multiple_groups: str, horizon: int) -> None:
         """Test extending dataset by horizon."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
 
         pre_len = dataset.df.groupby(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME).size()
 
@@ -105,10 +131,7 @@ class TestU2TimeSeriesPredictionDataset:
     @pytest.mark.parametrize(("horizon"), [1, 24, 72])
     def test_split_past_and_future(self, csv_multiple_groups: str, horizon: int) -> None:
         """Test splitting past and future dataframes."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
 
         pre_len = dataset.df.groupby(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME).size()
 
@@ -130,15 +153,11 @@ class TestU2TimeSeriesPredictionDataset:
         with contextlib.suppress(FileNotFoundError, Exception):
             U2TimeSeriesPredictionDataset.from_csv(
                 "/invalid/path/to/file.csv",
-                min_num_rows_per_group=10,
             )
 
     def test_add_temporal(self, csv_multiple_groups: str) -> None:
         """Test that temporal features are added and recorded."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
 
         dataset.add_temporal()
 
@@ -149,10 +168,7 @@ class TestU2TimeSeriesPredictionDataset:
     @pytest.mark.parametrize(("lags", "windows"), [([24, 48, 72], [12, 24]), ([48, 72], [24, 72])])
     def test_add_lags(self, csv_multiple_groups: str, lags: list[int], windows: list[int]) -> None:
         """Test that lag and rolling features are added and rows trimmed accordingly."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
         stats = ["mean", "std", "max", "min"]
 
         max_shift = max(lags + windows)
@@ -196,39 +212,45 @@ class TestU2TimeSeriesPredictionDataset:
                     assert np.allclose(expected_roll_stat, actual_roll_stat, atol=1e-9)
 
     @pytest.mark.parametrize(
-        ("lags", "windows", "expectation"),
+        ("lags", "windows", "min_lookback", "expectation"),
         [
-            ([24, 72], [12, 48], does_not_raise()),
+            ([24, 72], [12, 48], 24, does_not_raise()),
             (
-                [144],
+                [96],
                 [12, 24],
+                48,
                 pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
             ),
             (
                 [48],
-                [24, 168],
+                [24, 120],
+                48,
+                pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
+            ),
+            (
+                [48],
+                [24, 48],
+                72,
                 pytest.raises(ValueError, match="No group in the input CSV has enough rows to predict on."),
             ),
         ],
     )
     def test_long_lags(
-        self, csv_multiple_groups: str, lags: list[int], windows: list[int], expectation: AbstractContextManager
+        self,
+        csv_multiple_groups: str,
+        lags: list[int],
+        windows: list[int],
+        min_lookback: int,
+        expectation: AbstractContextManager,
     ) -> None:
         """Test that lag and rolling features are added and rows trimmed accordingly."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
         with expectation:
-            # TODO: set min_num_rows to max(min_num_rows, max(lags+windows))
-            dataset.add_lags(lags=lags, windows=windows)
+            dataset.drop_short_groups(max(*lags, *windows) + min_lookback)
 
     def test_add_holidays_monkeypatched(self, csv_multiple_groups: str, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test add_holidays using monkeypatched holidays merger to avoid external calls."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
 
         def fake_merge_holidays(df: pd.DataFrame, location_col: str, datetime_col: str):  # noqa: ANN202, ARG001
             df2 = df.copy()
@@ -245,10 +267,7 @@ class TestU2TimeSeriesPredictionDataset:
 
     def test_add_weather_monkeypatched(self, csv_multiple_groups: str, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test add_weather using monkeypatched weather enricher to avoid external calls."""
-        dataset = U2TimeSeriesPredictionDataset.from_csv(
-            csv_multiple_groups,
-            min_num_rows_per_group=10,
-        )
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
 
         def fake_enrich_weather(  # noqa: ANN202
             df: pd.DataFrame,

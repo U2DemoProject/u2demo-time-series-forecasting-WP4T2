@@ -2,10 +2,9 @@
 
 from unittest.mock import Mock
 
-import pytest
 import requests
 
-from u2.utils import is_retryable_error, parse_prefixed_int_columns
+from u2.utils import is_retryable_error
 
 
 class TestIsRetryableError:
@@ -44,31 +43,3 @@ class TestIsRetryableError:
         exc = requests.exceptions.RequestException()
         exc.response = None
         assert is_retryable_error(exc) is False
-
-
-class TestParsePrefixedIntColumns:
-    """Tests for parse_prefixed_int_columns function."""
-
-    def test_parse_no_matching_columns(self):
-        """Test parsing with no matching columns."""
-        columns = ["roll_7", "roll_24"]
-        result = parse_prefixed_int_columns(columns, "lag_")
-        assert result == []
-
-    def test_parse_empty_column_list(self):
-        """Test parsing empty column list."""
-        columns = []
-        result = parse_prefixed_int_columns(columns, "lag_")
-        assert result == []
-
-    def test_parse(self):
-        """Test parsing large integers."""
-        columns = ["lag_0", "lag_168", "lag_672", "lag_1000"]
-        result = parse_prefixed_int_columns(columns, "lag_")
-        assert sorted(result) == [0, 168, 672, 1000]
-
-    def test_parse_invalid_suffix_raises_error(self):
-        """Test that non-integer suffix raises ValueError."""
-        columns = ["lag_abc"]
-        with pytest.raises(ValueError, match="invalid literal"):
-            parse_prefixed_int_columns(columns, "lag_")

@@ -198,45 +198,45 @@ def enrich_weather(
     df["time_aligned"] = df[time_col].dt.floor("h") if frequency == "h" else df[time_col].dt.normalize()
     enriched_parts = []
 
+    def _process_subset(df_chunk: pd.DataFrame, mode: str, lat: float, lon: float) -> pd.DataFrame:
+        if df_chunk.empty:
+            return df_chunk
+
+        min_date = df_chunk[time_col].min().date()
+        max_date = df_chunk[time_col].max().date()
+        try:
+            weather_df = fetch_weather(
+                lat=lat,
+                lon=lon,
+                start_date=min_date.isoformat(),
+                end_date=max_date.isoformat(),
+                variables=variables,
+                frequency=frequency,
+                mode=mode,
+            )
+        except Exception as e:
+            error = f"Failed to fetch weather for ({lat}, {lon}) in mode `{mode}`"
+            logger.error(error)
+            raise e
+
+        if weather_df.empty:
+            error = f"No weather data for ({lat}, {lon}) in mode `{mode}`"
+            logger.error(error)
+            raise ValueError(error)
+
+        weather_df["time_aligned"] = (
+            weather_df["time"].dt.floor("h") if frequency == "h" else weather_df["time"].dt.normalize()
+        )
+        weather_df = weather_df.drop(columns=["time"])
+        return pd.merge(df_chunk, weather_df, on="time_aligned", how="left")
+
     for lat, lon in df[["latitude", "longitude"]].drop_duplicates().itertuples(index=False):
         df_sub = df[(df["latitude"] == lat) & (df["longitude"] == lon)].copy()
         df_past = df_sub[df_sub[time_col] <= present_time]
         df_future = df_sub[df_sub[time_col] > present_time]
 
-        def process_subset(df_chunk: pd.DataFrame, mode: str, lat: float, lon: float) -> pd.DataFrame:
-            if df_chunk.empty:
-                return df_chunk
-
-            min_date = df_chunk[time_col].min().date()
-            max_date = df_chunk[time_col].max().date()
-            try:
-                weather_df = fetch_weather(
-                    lat=lat,
-                    lon=lon,
-                    start_date=min_date.isoformat(),
-                    end_date=max_date.isoformat(),
-                    variables=variables,
-                    frequency=frequency,
-                    mode=mode,
-                )
-            except Exception as e:
-                error = f"Failed to fetch weather for ({lat}, {lon}) in mode `{mode}`"
-                logger.error(error)
-                raise e
-
-            if weather_df.empty:
-                error = f"No weather data for ({lat}, {lon}) in mode `{mode}`"
-                logger.error(error)
-                raise ValueError(error)
-
-            weather_df["time_aligned"] = (
-                weather_df["time"].dt.floor("h") if frequency == "h" else weather_df["time"].dt.normalize()
-            )
-            weather_df = weather_df.drop(columns=["time"])
-            return pd.merge(df_chunk, weather_df, on="time_aligned", how="left")
-
-        enriched_parts.append(process_subset(df_past, "historical", lat, lon))
-        enriched_parts.append(process_subset(df_future, "forecast", lat, lon))
+        enriched_parts.append(_process_subset(df_past, "historical", lat, lon))
+        enriched_parts.append(_process_subset(df_future, "forecast", lat, lon))
 
     final_df = pd.concat(enriched_parts, ignore_index=True)
     return final_df.drop(columns=["time_aligned"]), variables

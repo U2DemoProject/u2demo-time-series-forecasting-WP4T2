@@ -33,29 +33,6 @@ def is_retryable_error(exception: BaseException) -> bool:
     )
 
 
-def parse_prefixed_int_columns(columns: list[str], prefix: str) -> list[int]:
-    """
-    Extract integer suffixes from column names that begin with a given prefix.
-
-    This function filters for column names starting with `prefix`, then splits on
-    the first underscore and converts the portion after the underscore into an integer.
-
-    Parameters
-    ----------
-    columns : list[str]
-        A list of column name strings (e.g., ["val_1", "val_2", "other"]).
-    prefix : str
-        The required prefix (e.g., "val_").
-
-    Returns
-    -------
-    list[int]
-        A list of integers extracted from the matching column names.
-
-    """
-    return [int(c.split("_")[1]) for c in columns if c.startswith(prefix)]
-
-
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -107,3 +84,44 @@ def geocode(place_name: str) -> dict:
     ret["latitude"], ret["longitude"] = location.latitude, location.longitude
 
     return ret
+
+
+def get_known_covariates(time_series_added_columns: dict[str, list[str]], horizon: int) -> list[str]:
+    """
+    Derive the list of known covariate feature columns for forecasting.
+
+    Given a mapping of feature categories to lists of added column names (as
+    produced by the dataset feature engineering pipeline), this function filters
+    out plain lag features whose lag value is smaller than the forecast horizon,
+    since those lags depend on unknown future target values at prediction time.
+
+    Parameters
+    ----------
+    time_series_added_columns : dict[str, list[str]]
+        Dictionary mapping feature family (e.g., "temporal", "lag", "holiday",
+        "weather") to lists of added column names.
+    horizon : int
+        Forecast horizon (number of future steps to predict).
+
+    Returns
+    -------
+    list[str]
+        List of column names that can be treated as known covariates during
+        forecasting.
+
+    Notes
+    -----
+    - Rolling statistics columns (those starting with "roll_") are kept.
+    - Plain lag columns (e.g., "lag_1", "lag_24") are removed if their lag is
+      strictly smaller than `horizon`.
+
+    """
+    known_covariates = [item for v in time_series_added_columns.values() for item in v]
+    unknown_lag_columns = []
+    for lag_column in time_series_added_columns["lag"]:
+        if "lag" in lag_column and "roll" not in lag_column:
+            lag = int(lag_column.split("_")[-1])
+            if lag < horizon:
+                unknown_lag_columns.append(lag_column)
+    known_covariates = list(set(known_covariates) - set(unknown_lag_columns))
+    return known_covariates

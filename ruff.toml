@@ -45,7 +45,7 @@ ignore = [
     "D205", # blank-line-after-summary
     "D107", # undocumented-public-init
 
-    "ANN002", #Missing type annotation for `*args`
+    "ANN002", # Missing type annotation for `*args`
     "ANN003", # missing type annotation for **kwargs
     "ANN204", # Missing return type annotation for special method `__init__`
     "PLR2004", # magic-value-comparision
@@ -53,6 +53,8 @@ ignore = [
     "PLR0913",   # Too many arguments in function definition (6 > 5)
     "FBT001", # Boolean-typed positional argument in function definition
     "FBT002", # Boolean default positional argument in function definition
+
+    "RET504", # Unnecessary assignment to `known_covariates` before `return` statement
 ]
 
 extend-safe-fixes = ["C", "D", "A", "W291"]

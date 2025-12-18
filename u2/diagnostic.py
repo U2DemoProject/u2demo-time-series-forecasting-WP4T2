@@ -4,7 +4,13 @@ from .logging_config import logger
 
 
 def sanity_check() -> None:
-    """logger.info diagnostic information about Pytorch, CUDA, GPU status, etc."""
+    """
+    Log diagnostic information about PyTorch, CUDA availability, and GPUs.
+
+    This function writes information to the configured logger, including:
+    - Whether CUDA is available and its version
+    - Number of detected GPUs and their names
+    """
     # Check PyTorch version
 
     # Check if CUDA is available

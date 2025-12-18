@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 
 from u2.defaults import (
-    DEFAULT_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
+    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
@@ -35,7 +35,7 @@ def csv_multiple_groups_different_end_dates(temp_dir: str) -> str:
     for dates, group in [(dates_group1, "group_1"), (dates_group2, "group_2"), (dates_group3, "group_3")]:
         group_data = {
             DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-            DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
             DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
             DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: [group] * len(dates),
         }
@@ -61,7 +61,7 @@ def csv_multiple_groups(temp_dir: str) -> str:
     for dates, group in [(dates_group1, "group_1"), (dates_group2, "group_2"), (dates_group3, "group_3")]:
         group_data = {
             DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-            DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
             DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
             DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: [group] * len(dates),
         }
@@ -80,7 +80,7 @@ def csv_single_group(temp_dir: str) -> str:
     dates = pd.date_range(start="2023-01-01", periods=168, freq="h")
     data = {
         DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-        DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+        DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
         DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
         DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: ["group_1"] * len(dates),
     }
@@ -98,7 +98,7 @@ def csv_daily_freq(temp_dir: str) -> str:
     dates = pd.date_range(start="2023-01-01", periods=28, freq="d")
     data = {
         DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-        DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+        DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
         DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
         DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: ["group_1"] * len(dates),
     }
@@ -123,7 +123,7 @@ def csv_same_end_date_different_length(temp_dir: str) -> str:
     for dates, group in [(dates_group1, "group_1"), (dates_group2, "group_2"), (dates_group3, "group_3")]:
         group_data = {
             DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-            DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
             DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
             DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: [group] * len(dates),
         }
@@ -142,7 +142,7 @@ def csv_empty(temp_dir: str) -> str:
     df = pd.DataFrame(
         columns=[
             DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
-            DEFAULT_LOCATION_COLUMN_NAME,
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
             DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
             DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
         ]
@@ -160,7 +160,7 @@ def csv_short_periods(temp_dir: str) -> str:
     dates = pd.date_range(start="2023-01-01", periods=5, freq="h")
     data = {
         DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-        DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * 5,
+        DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * 5,
         DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(5),
         DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: ["group_1"] * 5,
     }
@@ -183,7 +183,7 @@ def csv_with_nan_values(temp_dir: str) -> str:
 
     data = {
         DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
-        DEFAULT_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+        DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
         DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: values,
         DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: ["group_1"] * len(dates),
     }

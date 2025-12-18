@@ -6,10 +6,8 @@ import pandas as pd
 from joblib import Memory
 
 from .defaults import (
-    DEFAULT_LAG_WINDOWS,
-    DEFAULT_LAGS,
-    DEFAULT_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
+    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
     DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
@@ -53,6 +51,7 @@ class U2TimeSeriesPredictionDataset:
     """
 
     def __init__(self):
+        self.csv_name = None
         self.df = None
         self.future_df = None
         self.added_columns = {}
@@ -64,8 +63,7 @@ class U2TimeSeriesPredictionDataset:
     def from_csv(  # noqa: PLR0912
         cls,
         time_series_csv: str,
-        min_num_rows_per_group: int,
-        location_col_name: str = DEFAULT_LOCATION_COLUMN_NAME,
+        location_col_name: str = DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
         timestamp_col_name: str = DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
         predict_value_col_name: str = DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
         group_col_name: str = DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
@@ -79,7 +77,6 @@ class U2TimeSeriesPredictionDataset:
         - Reads the CSV into a DataFrame
         - Ensures required columns (timestamp, value, location) exist
         - Creates a default group column if missing
-        - Drops groups with fewer than `min_num_rows_per_group` rows
         - Verifies that all groups share the same final timestamp
         - Ensures all groups have a consistent inferred frequency ("h" or "D")
         - Normalizes column names to U2 defaults
@@ -89,8 +86,6 @@ class U2TimeSeriesPredictionDataset:
         ----------
         time_series_csv : str
             Path to the CSV file.
-        min_num_rows_per_group : int
-            Minimum number of rows required per group to be included.
         location_col_name : str, optional
             Column name for the location identifier.
         timestamp_col_name : str, optional
@@ -116,9 +111,10 @@ class U2TimeSeriesPredictionDataset:
 
         """
         obj = cls()
+        obj.csv_name = os.path.basename(time_series_csv)
         obj.df = pd.read_csv(time_series_csv, *args, **kwargs)
 
-        obj.min_num_rows_per_group = min_num_rows_per_group
+        # obj.min_num_rows_per_group = min_num_rows_per_group
 
         if (
             timestamp_col_name not in obj.df.columns
@@ -127,6 +123,10 @@ class U2TimeSeriesPredictionDataset:
         ):
             error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` and/or `{location_col_name}` columns are missing."
             raise AttributeError(error)
+
+        if obj.df.empty:
+            error = "The input data is empty."
+            raise ValueError(error)
 
         if obj.df.isna().any().any():
             error = "The input data contains NaN values."
@@ -140,8 +140,6 @@ class U2TimeSeriesPredictionDataset:
                 f"`{group_col_name}` column is not present in time series CSV `{time_series_csv}`, assuming all values belong to a single group."
             )
             obj.df[group_col_name] = 0
-
-        obj.drop_short_groups(group_col_name)
 
         # All groups must have the same final timestamp
         final_timestamps = set(obj.df.groupby(group_col_name)[timestamp_col_name].max().to_list())
@@ -176,28 +174,37 @@ class U2TimeSeriesPredictionDataset:
             obj.df = obj.df.rename(columns={predict_value_col_name: DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME})
         if group_col_name != DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME:
             obj.df = obj.df.rename(columns={group_col_name: DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME})
-        if location_col_name != DEFAULT_LOCATION_COLUMN_NAME:
-            obj.df = obj.df.rename(columns={location_col_name: DEFAULT_LOCATION_COLUMN_NAME})
+        if location_col_name != DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME:
+            obj.df = obj.df.rename(columns={location_col_name: DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME})
 
         obj.df = obj.df.sort_values([DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME])
 
+        keep_cols = [
+            DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
+            DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
+            DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
+        ]
+        obj.df = obj.df[keep_cols]
+
         return obj
 
-    def drop_short_groups(self, group_col_name: str) -> None:
+    def drop_short_groups(self, min_group_length: int) -> None:
         """
         Drop groups from the dataset that do not have enough rows for prediction.
 
         For each group in the specified column:
         - Counts the number of rows per group
-        - Identifies groups with fewer rows than `self.min_num_rows_per_group`
+        - Identifies groups with fewer rows than `min_group_length`
         - Logs a warning listing the dropped groups
         - Removes rows belonging to these short groups from `self.df`
         - Raises a ValueError if no groups remain after filtering
 
         Parameters
         ----------
-        group_col_name : str
-            Name of the column containing the groups to evaluate.
+        min_group_length : int
+            Minimum number of rows required per group to keep it; groups with fewer
+            rows than `min_group_length` are dropped.
 
         Returns
         -------
@@ -209,15 +216,15 @@ class U2TimeSeriesPredictionDataset:
             If no group has enough rows to predict on.
 
         """
-        counts = self.df[group_col_name].value_counts()
-        dropped = counts[counts < self.min_num_rows_per_group].index.tolist()
+        counts = self.df[DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME].value_counts()
+        dropped = counts[counts < min_group_length].index.tolist()
         if dropped:
             logger.warning(
-                f"The following groups were dropped because they have too few rows to predict on (<{self.min_num_rows_per_group}):"
+                f"The following groups were dropped because they have too few rows to predict on (<{min_group_length}):"
             )
             for d in dropped:
                 logger.warning(f"\t{d}")
-            self.df = self.df[self.df[group_col_name].map(counts) >= self.min_num_rows_per_group]
+            self.df = self.df[self.df[DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME].map(counts) >= min_group_length]
         if self.df.empty:
             error = "No group in the input CSV has enough rows to predict on."
             logger.error(error)
@@ -249,7 +256,7 @@ class U2TimeSeriesPredictionDataset:
             last_ts = subdf[DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME].iloc[-1]
 
             # Each group keeps its own location
-            location_value = subdf[DEFAULT_LOCATION_COLUMN_NAME].iloc[0]
+            location_value = subdf[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME].iloc[0]
 
             # Create horizon new timestamps
             new_timestamps = [last_ts + self.freq_timedelta * (i + 1) for i in range(horizon)]
@@ -258,7 +265,7 @@ class U2TimeSeriesPredictionDataset:
                 {
                     DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: item_id,
                     DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: new_timestamps,
-                    DEFAULT_LOCATION_COLUMN_NAME: location_value,
+                    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: location_value,
                 }
             )
 
@@ -324,7 +331,7 @@ class U2TimeSeriesPredictionDataset:
         """
         self.df, self.added_columns["temporal"] = add_encoded_time_features(self.df)
 
-    def add_lags(self, lags: list[int] = DEFAULT_LAGS, windows: list[int] = DEFAULT_LAG_WINDOWS) -> None:
+    def add_lags(self, lags: list[int], windows: list[int]) -> None:
         """
         Add lagged target values and rolling statistical features.
 
@@ -353,7 +360,7 @@ class U2TimeSeriesPredictionDataset:
             lag_gen.create_lag_features(col, lags=lags)
             lag_gen.create_rolling_stat_features(col, windows=windows)
         self.df, self.added_columns["lag"] = lag_gen.finalize()
-        self.drop_short_groups(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME)
+        # self.drop_short_groups(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME)
 
     def add_holidays(self) -> None:
         """
@@ -370,7 +377,7 @@ class U2TimeSeriesPredictionDataset:
 
         """
         self.df, self.added_columns["holiday"] = merge_holidays_for_multiple_places(
-            self.df, DEFAULT_LOCATION_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME
+            self.df, DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME
         )
 
     def add_weather(self) -> None:
@@ -391,7 +398,11 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
-        present_time = self.final_timestamp + self.freq_timedelta
+        present_time = self.final_timestamp
         self.df, self.added_columns["weather"] = enrich_weather(
-            self.df, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME, DEFAULT_LOCATION_COLUMN_NAME, present_time, self.freq
+            self.df,
+            DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
+            present_time,
+            self.freq,
         )
