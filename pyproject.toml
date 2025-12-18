@@ -30,3 +30,6 @@ dev = [
     "ruff-lsp (>=0.0.62,<0.0.63)",
     "pytest (>=9.0.2,<10.0.0)"
 ]
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"

@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# But include the u2 folder and cli.py
+!u2/
+!cli.py
+!requirements.txt
+
