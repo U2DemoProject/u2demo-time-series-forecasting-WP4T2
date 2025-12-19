@@ -7,6 +7,8 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from autogluon.timeseries.metrics import WAPE
 
+from u2.utils import get_min_group_length
+
 from . import __version__
 from .dataset import U2TimeSeriesPredictionDataset
 from .defaults import (
@@ -54,7 +56,7 @@ class U2TimeSeriesPredictionModel:
         self.lock = threading.RLock()
         self.metadata = None
 
-    def _save_leaderboards(self, num_test_windows: int, horizon: int, test_data: TimeSeriesDataFrame) -> None:
+    def _save_leaderboards(self, num_test_windows: int, test_data: TimeSeriesDataFrame) -> None:
         """
         Compute and save average leaderboard metrics over multiple cutoff windows.
 
@@ -62,8 +64,6 @@ class U2TimeSeriesPredictionModel:
         ----------
         num_test_windows : int
             Number of rolling cutoffs to evaluate.
-        horizon : int
-            Forecast horizon (steps) per cutoff.
         test_data : TimeSeriesDataFrame
             Held-out dataset used for leaderboard evaluation.
 
@@ -73,6 +73,7 @@ class U2TimeSeriesPredictionModel:
             Writes a CSV file with averaged metrics to the model directory.
 
         """
+        horizon = self.predictor.prediction_length
         cutoffs = range(-num_test_windows * horizon, -horizon + 1, horizon)
         leaderboards = []
         for cutoff in cutoffs:
@@ -95,7 +96,6 @@ class U2TimeSeriesPredictionModel:
     def _save_metadata(
         self,
         time_series: U2TimeSeriesPredictionDataset,
-        horizon: int,
         min_lookback: int,
         num_test_windows: int,
         training_start: str,
@@ -108,8 +108,6 @@ class U2TimeSeriesPredictionModel:
         ----------
         time_series : U2TimeSeriesPredictionDataset
             Dataset used for training, providing frequency and added columns.
-        horizon : int
-            Forecast horizon used during training.
         min_lookback : int
             Minimum lookback used to form the backtest split.
         num_test_windows : int
@@ -127,10 +125,7 @@ class U2TimeSeriesPredictionModel:
 
         """
         os.makedirs(f"{self.model_path}/u2", exist_ok=True)
-        lags = [int(col.split("_")[1]) for col in time_series.added_columns["lag"] if col.startswith("lag_")]
-        # There are other "roll_" columns, but they all have the same ending numbers as "roll_mean_"
-        # Also use idx = 2 because there are two underscores for these ones
-        windows = [int(col.split("_")[2]) for col in time_series.added_columns["lag"] if col.startswith("roll_mean_")]
+
         metadata = {
             "version": __version__,
             "training": {
@@ -141,13 +136,24 @@ class U2TimeSeriesPredictionModel:
                 "num_test_windows": num_test_windows,
                 "kwargs": training_kwargs,
             },
-            "min_group_length": max(min_lookback, max(lags)),  ## NOQA: PLW3301 (It's more comprehensible this way)
-            "frequency": time_series.freq,
-            "horizon": horizon,
-            "lags": lags,
-            "windows": windows,
+            "frequency": self.predictor.freq,
+            "horizon": self.predictor.prediction_length,
             "added_columns": time_series.added_columns,
         }
+
+        if "lag" in time_series.added_columns:
+            lags = [int(col.split("_")[1]) for col in time_series.added_columns["lag"] if col.startswith("lag_")]
+            # There are other "roll_" columns, but they all have the same ending numbers as "roll_mean_"
+            windows = [
+                int(col.split("_")[2]) for col in time_series.added_columns["lag"] if col.startswith("roll_mean_")
+            ]
+
+            metadata["lags"] = lags
+            metadata["windows"] = windows
+        else:
+            lags = [0]
+        metadata["min_group_length"] = get_min_group_length(lags=lags, min_lookback=min_lookback)
+
         with open(f"{self.model_path}/{DEFAULT_MODEL_METADATA_PATH}", "w") as f:
             json.dump(metadata, f, indent=4)
         self.metadata = metadata
@@ -271,7 +277,6 @@ class U2TimeSeriesPredictionModel:
         self,
         time_series: U2TimeSeriesPredictionDataset,
         min_lookback: int,
-        horizon: int,
         num_test_windows: int,
         save_leaderboards: bool = False,
         training_kwargs: dict = None,
@@ -290,8 +295,6 @@ class U2TimeSeriesPredictionModel:
             Dataset containing the engineered training DataFrame.
         min_lookback : int
             Minimum lookback used to form the backtest split.
-        horizon : int
-            Forecast horizon in steps for evaluation and metadata.
         num_test_windows : int
             Number of backtesting windows used for evaluation.
         save_leaderboards : bool, optional
@@ -308,18 +311,26 @@ class U2TimeSeriesPredictionModel:
             training_kwargs = {}
 
         df = time_series.df.copy()
+
+        if time_series.freq != self.predictor.freq:
+            logger.warning(
+                f"Input data has frequency of {time_series.freq} while the model is set with a frequency of {self.predictor.freq}.\n"
+                "The data will be resampled to match, make sure it is intended"
+            )
         # Location column name is often hanging around from reading the CSV because it is needed for stuff like weather
         # and holidays, but we don't need it so get rid of it
         df = df.drop(columns=[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME, "latitude", "longitude"], errors="ignore")
         df = TimeSeriesDataFrame(df)
 
-        train_data, test_data = df.train_test_split(prediction_length=min_lookback + horizon * num_test_windows)
+        train_data, test_data = df.train_test_split(
+            prediction_length=min_lookback + self.predictor.prediction_length * num_test_windows
+        )
         training_start = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
         self.predictor.fit(train_data, **training_kwargs)
 
-        self._save_metadata(time_series, horizon, min_lookback, num_test_windows, training_start, training_kwargs)
+        self._save_metadata(time_series, min_lookback, num_test_windows, training_start, training_kwargs)
         if save_leaderboards:
-            self._save_leaderboards(num_test_windows, horizon, test_data)
+            self._save_leaderboards(num_test_windows, test_data)
 
     def predict(self, time_series: U2TimeSeriesPredictionDataset, **kwargs) -> TimeSeriesDataFrame:
         """

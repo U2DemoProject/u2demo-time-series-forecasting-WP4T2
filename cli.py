@@ -20,7 +20,7 @@ from u2.defaults import (
 from u2.diagnostic import sanity_check
 from u2.logging_config import logger
 from u2.model import U2TimeSeriesPredictionModel
-from u2.utils import get_known_covariates
+from u2.utils import get_known_covariates, get_min_group_length
 
 
 def predict(
@@ -216,8 +216,12 @@ def train(
         **from_csv_kwargs,
     )
 
-    lags = [TIMESTEPS_IN_WEEKLY_CYCLE[time_series.freq] * (1 + i) for i in range(num_weekly_lags)]
-    time_series.drop_short_groups(max(lags) + min_lookback)
+    if "lag" in features:
+        lags = [TIMESTEPS_IN_WEEKLY_CYCLE[time_series.freq] * (1 + i) for i in range(num_weekly_lags)]
+    else:
+        lags = [0]
+    min_group_length = get_min_group_length(lags=lags, min_lookback=min_lookback)
+    time_series.drop_short_groups(min_group_length)
 
     if "temporal" in features:
         time_series.add_temporal()
@@ -244,7 +248,6 @@ def train(
     model.train(
         time_series,
         min_lookback=min_lookback,
-        horizon=horizon,
         num_test_windows=num_test_windows,
         save_leaderboards=save_leaderboards,
         training_kwargs=training_kwargs,

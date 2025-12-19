@@ -17,6 +17,7 @@ dependencies = [
     "tenacity (>=9.1.2,<10.0.0)",
     "joblib (>=1.5.2,<2.0.0)",
     "autogluon[timeseries] (>=1.4.0,<2.0.0)",
+    "lightning (==2.5.1)",
 ]
 
 

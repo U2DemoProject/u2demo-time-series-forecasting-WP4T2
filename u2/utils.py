@@ -117,11 +117,32 @@ def get_known_covariates(time_series_added_columns: dict[str, list[str]], horizo
 
     """
     known_covariates = [item for v in time_series_added_columns.values() for item in v]
-    unknown_lag_columns = []
-    for lag_column in time_series_added_columns["lag"]:
-        if "lag" in lag_column and "roll" not in lag_column:
-            lag = int(lag_column.split("_")[-1])
-            if lag < horizon:
-                unknown_lag_columns.append(lag_column)
-    known_covariates = list(set(known_covariates) - set(unknown_lag_columns))
+    if "lag" in time_series_added_columns:
+        unknown_lag_columns = []
+        for lag_column in time_series_added_columns["lag"]:
+            if "lag" in lag_column and "roll" not in lag_column:
+                lag = int(lag_column.split("_")[-1])
+                if lag < horizon:
+                    unknown_lag_columns.append(lag_column)
+        known_covariates = list(set(known_covariates) - set(unknown_lag_columns))
     return known_covariates
+
+
+def get_min_group_length(lags: list[int], min_lookback: int) -> int:
+    """
+    Gets the minimum group length to have min_lookback steps after adding lags.
+
+    Parameters
+    ----------
+    lags : list[int]
+        List of lag features to be added.
+    min_lookback : int
+        Minimum amount of steps of historical data to have.
+
+    Returns
+    -------
+    int
+        The minimum group length expected.
+
+    """
+    return max(lags) + min_lookback

@@ -211,3 +211,29 @@ def csv_other_columns(temp_dir: str) -> str:
     df.to_csv(csv_path, index=False)
 
     return csv_path
+
+
+@pytest.fixture
+def csv_long_periods(temp_dir: str) -> str:
+    """Create a CSV with multiple groups that have different end dates."""
+    start = "2023-01-01"
+    periods = 2048
+    dates_group1 = pd.date_range(end=start, periods=periods, freq="h")
+    dates_group2 = pd.date_range(end=start, periods=periods, freq="h")
+    dates_group3 = pd.date_range(end=start, periods=periods, freq="h")
+
+    data = []
+    for dates, group in [(dates_group1, "group_1"), (dates_group2, "group_2"), (dates_group3, "group_3")]:
+        group_data = {
+            DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
+            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: ["Berlin"] * len(dates),
+            DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
+            DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: [group] * len(dates),
+        }
+        data.append(pd.DataFrame(group_data))
+
+    df = pd.concat(data, ignore_index=True)
+    csv_path = os.path.join(temp_dir, "long_periods.csv")
+    df.to_csv(csv_path, index=False)
+
+    return csv_path
