@@ -1,0 +1,94 @@
+stages:
+  - lint
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  POETRY_VERSION: "2.2.1"
+  POETRY_NO_INTERACTION: "1"
+
+# Cache configuration for faster builds
+cache:
+  key:
+    files:
+      - poetry.lock
+  paths:
+    - .cache/pip
+
+# Base job template for Python setup
+.python_base:
+  image: python:3.12
+  before_script:
+    - pip install poetry==$POETRY_VERSION
+    - poetry config virtualenvs.in-project true
+    - poetry install --no-root
+
+
+# lint conventional commits
+validate_commits:
+  image: alpine:3.21
+  stage: lint
+  tags:
+    - kvm_runner_1
+  only:
+    - merge_request
+
+  script:
+    - |
+      # Since branches are squashed on merge, we only check the merge commit message
+      # This will be the most recent commit on the development branch
+      
+      echo "Checking commit message: $CI_MERGE_REQUEST_TITLE"
+      
+      if ! echo "$CI_MERGE_REQUEST_TITLE" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"; then
+        echo "ERROR: Merge commit message does not follow conventional commits format:"
+        echo "  '$CI_MERGE_REQUEST_TITLE'"
+        echo ""
+        echo "Expected format: <type>(<scope>): <subject>"
+        echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+        echo ""
+        echo "Examples:"
+        echo "  feat(api): add user authentication"
+        echo "  fix: resolve database connection issue"
+        echo "  docs: update installation guide"
+        exit 1
+      fi
+      
+      echo "✓ Merge commit follows conventional commits format"
+
+# Enforce ruff check
+ruff_check:
+  extends: .python_base
+  stage: lint
+  tags:
+    - kvm_runner_1
+  only:
+    - merge_request
+  script:
+    - poetry run ruff check
+    - echo "✓ Ruff check passed with no errors"
+
+# Run ruff format
+ruff_format:
+  extends: .python_base
+  stage: lint
+  tags:
+    - kvm_runner_1
+  only:
+    - merge_request
+  script:
+    - poetry run ruff format --check
+    - echo "✓ Code formatting is correct"
+
+# Run tests 
+test:
+  extends: .python_base
+  stage: test
+  tags:
+    - kvm_runner_1
+  only:
+    - main
+    - merge_request
+  script:
+    - poetry run pytest
+    - echo "✓ All tests passed"

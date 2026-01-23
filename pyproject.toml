@@ -3,7 +3,8 @@ name = "u2"
 version = "0.1.0"
 description = "Time Series Prediction Algorithm Implementation for U2 Demo Project"
 authors = [
-    {name = "Isaac Boates",email = "isaac.boates@eifer.org"}
+    {name = "Isaac Boates",email = "isaac.boates@eifer.org"},
+    {name = "Hubert Kriebitzsch", email = "hubert.kriebitzsch@eifer.org"}
 ]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -29,7 +30,8 @@ build-backend = "poetry.core.masonry.api"
 dev = [
     "ruff (>=0.14.8,<0.15.0)",
     "ruff-lsp (>=0.0.62,<0.0.63)",
-    "pytest (>=9.0.2,<10.0.0)"
+    "pytest (>=9.0.2,<10.0.0)",
+    "pre-commit (>=4.5.1,<5.0.0)"
 ]
 
 [tool.poetry.requires-plugins]

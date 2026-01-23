@@ -85,6 +85,7 @@ class TestU2TimeSeriesPredictionModel:
     def test_predict_before_and_after_load(self, temp_dir: str, csv_multiple_groups: str):
         horizon = 5
         freq = "h"
+        random_seed = 54
 
         model_path = os.path.join(temp_dir, "predict_load")
         dataset = U2TimeSeriesPredictionDataset.from_csv(csv_multiple_groups)
@@ -93,10 +94,14 @@ class TestU2TimeSeriesPredictionModel:
         model.new(
             target_column="value", known_covariates_names=[], prediction_length=horizon, freq=freq, eval_metric="WQL"
         )
-        training_kwargs = {"enable_ensemble": False, "hyperparameters": {"DeepAR": {}}, "random_seed": 54}
+        training_kwargs = {
+            "enable_ensemble": False,
+            "hyperparameters": {"RecursiveTabular": {"trainer_kwargs": {"accelerator": "cpu"}}},
+            "random_seed": random_seed,
+        }
         model.train(dataset, min_lookback=24, num_test_windows=0, training_kwargs=training_kwargs)
 
-        pred_kwargs = {"use_cache": False}
+        pred_kwargs = {"use_cache": False, "random_seed": random_seed}
 
         predictions = model.predict(dataset, **pred_kwargs)
 
