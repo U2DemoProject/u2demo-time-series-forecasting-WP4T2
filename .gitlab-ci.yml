@@ -6,6 +6,7 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_VERSION: "2.2.1"
   POETRY_NO_INTERACTION: "1"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
 
 # Cache configuration for faster builds
 cache:
@@ -14,13 +15,21 @@ cache:
       - poetry.lock
   paths:
     - .cache/pip
+    - .venv
 
-# Base job template for Python setup
+
+.lint_light:
+  image: python:3.12-slim
+  tags:
+    - kvm_runner_1
+
+
 .python_base:
-  image: python:3.12
+  image: python:3.12-slim
+  tags:
+    - kvm_runner_1
   before_script:
     - pip install poetry==$POETRY_VERSION
-    - poetry config virtualenvs.in-project true
     - poetry install --no-root
 
 
@@ -28,7 +37,7 @@ cache:
 validate_commits:
   image: alpine:3.21
   stage: lint
-  tags:
+  tags: 
     - kvm_runner_1
   only:
     - merge_request
@@ -38,10 +47,10 @@ validate_commits:
       # Since branches are squashed on merge, we only check the merge commit message
       # This will be the most recent commit on the development branch
       
-      echo "Checking commit message: $CI_MERGE_REQUEST_TITLE"
+      echo "Checking MR title: $CI_MERGE_REQUEST_TITLE"
       
       if ! echo "$CI_MERGE_REQUEST_TITLE" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"; then
-        echo "ERROR: Merge commit message does not follow conventional commits format:"
+        echo "ERROR: MR title does not follow conventional commits format:"
         echo "  '$CI_MERGE_REQUEST_TITLE'"
         echo ""
         echo "Expected format: <type>(<scope>): <subject>"
@@ -58,34 +67,32 @@ validate_commits:
 
 # Enforce ruff check
 ruff_check:
-  extends: .python_base
+  extends: .lint_light
   stage: lint
-  tags:
-    - kvm_runner_1
   only:
     - merge_request
+  before_script:
+    - pip install ruff
   script:
-    - poetry run ruff check
+    - ruff check
     - echo "✓ Ruff check passed with no errors"
 
 # Run ruff format
 ruff_format:
-  extends: .python_base
+  extends: .lint_light
   stage: lint
-  tags:
-    - kvm_runner_1
   only:
     - merge_request
+  before_script:
+    - pip install ruff
   script:
-    - poetry run ruff format --check
+    - ruff format --check
     - echo "✓ Code formatting is correct"
 
 # Run tests 
 test:
   extends: .python_base
   stage: test
-  tags:
-    - kvm_runner_1
   only:
     - main
     - merge_request
