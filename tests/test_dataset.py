@@ -42,7 +42,7 @@ class TestU2TimeSeriesPredictionDataset:
                 "csv_other_columns",
                 pytest.raises(
                     AttributeError,
-                    match=r"One of `.*` and/or `.*` and/or `.*` columns are missing.",
+                    match="One of `timestamp` and/or `value` columns are missing.",
                 ),
             ),
         ],
@@ -290,3 +290,12 @@ class TestU2TimeSeriesPredictionDataset:
 
         assert "weather" in dataset.added_columns
         assert "temperature_2m" in dataset.df.columns
+
+    def test_location_dependent_features_require_location(self, csv_without_location: str):
+        dataset = U2TimeSeriesPredictionDataset.from_csv(csv_without_location)
+
+        with pytest.raises(AttributeError, match="Location column is missing while `holiday` feature is enabled."):
+            dataset.add_holidays()
+
+        with pytest.raises(AttributeError, match="Location column is missing while `weather` feature is enabled."):
+            dataset.add_weather()

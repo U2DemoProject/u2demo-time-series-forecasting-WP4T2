@@ -319,16 +319,3 @@ Run a specific test file with:
 ```sh
 poetry run pytest tests/test_dataset.py
 ```
-
-Run tests matching a specific marker with:
-
-```sh
-# Run only unit tests
-poetry run pytest -m unit
-
-# Run only integration tests
-poetry run pytest -m integration
-
-# Skip slow tests
-poetry run pytest -m "not slow"
-```

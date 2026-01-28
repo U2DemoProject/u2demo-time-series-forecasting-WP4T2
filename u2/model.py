@@ -308,7 +308,7 @@ class U2TimeSeriesPredictionModel:
 
         """
         if training_kwargs is None:
-            training_kwargs = {}
+            training_kwargs = {"presets": "chronos2"}
 
         df = time_series.df.copy()
 

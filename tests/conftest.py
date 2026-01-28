@@ -237,3 +237,20 @@ def csv_long_periods(temp_dir: str) -> str:
     df.to_csv(csv_path, index=False)
 
     return csv_path
+
+
+@pytest.fixture
+def csv_without_location(temp_dir: str) -> str:
+    """Create a CSV without the location column."""
+    dates = pd.date_range(start="2023-01-01", periods=168, freq="h")
+    data = {
+        DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
+        DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.random.rand(len(dates)),
+        DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: ["group_1"] * len(dates),
+    }
+    df = pd.DataFrame(data)
+
+    csv_path = os.path.join(temp_dir, "without_location.csv")
+    df.to_csv(csv_path, index=False)
+
+    return csv_path

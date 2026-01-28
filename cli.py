@@ -204,8 +204,6 @@ def train(
 
     if from_csv_kwargs is None:
         from_csv_kwargs = {}
-    if training_kwargs is None:
-        training_kwargs = {}
 
     time_series = U2TimeSeriesPredictionDataset.from_csv(
         time_series_csv,

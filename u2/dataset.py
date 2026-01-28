@@ -114,14 +114,8 @@ class U2TimeSeriesPredictionDataset:
         obj.csv_name = os.path.basename(time_series_csv)
         obj.df = pd.read_csv(time_series_csv, *args, **kwargs)
 
-        # obj.min_num_rows_per_group = min_num_rows_per_group
-
-        if (
-            timestamp_col_name not in obj.df.columns
-            or predict_value_col_name not in obj.df.columns
-            or location_col_name not in obj.df.columns
-        ):
-            error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` and/or `{location_col_name}` columns are missing."
+        if timestamp_col_name not in obj.df.columns or predict_value_col_name not in obj.df.columns:
+            error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` columns are missing."
             raise AttributeError(error)
 
         if obj.df.empty:
@@ -183,8 +177,12 @@ class U2TimeSeriesPredictionDataset:
             DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
             DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
             DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
-            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
-        ]
+        ] + (
+            [DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME]
+            if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in obj.df.columns
+            else []
+        )
+
         obj.df = obj.df[keep_cols]
 
         return obj
@@ -255,19 +253,20 @@ class U2TimeSeriesPredictionDataset:
         for item_id, subdf in self.df.groupby(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME):
             last_ts = subdf[DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME].iloc[-1]
 
-            # Each group keeps its own location
-            location_value = subdf[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME].iloc[0]
-
             # Create horizon new timestamps
             new_timestamps = [last_ts + self.freq_timedelta * (i + 1) for i in range(horizon)]
 
-            blank = pd.DataFrame(
-                {
-                    DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: item_id,
-                    DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: new_timestamps,
-                    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME: location_value,
-                }
-            )
+            blank = {
+                DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: item_id,
+                DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: new_timestamps,
+            }
+
+            # Each group keeps its own location
+            if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in subdf.columns:
+                location_value = subdf[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME].iloc[0]
+                blank[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME] = location_value
+
+            blank = pd.DataFrame(blank)
 
             # Other columns should remain blank → add them as NaN automatically
             missing_cols = [c for c in self.df.columns if c not in blank.columns]
@@ -360,7 +359,6 @@ class U2TimeSeriesPredictionDataset:
             lag_gen.create_lag_features(col, lags=lags)
             lag_gen.create_rolling_stat_features(col, windows=windows)
         self.df, self.added_columns["lag"] = lag_gen.finalize()
-        # self.drop_short_groups(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME)
 
     def add_holidays(self) -> None:
         """
@@ -376,6 +374,9 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
+        if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME not in self.df.columns:
+            error = "Location column is missing while `holiday` feature is enabled."
+            raise AttributeError(error)
         self.df, self.added_columns["holiday"] = merge_holidays_for_multiple_places(
             self.df, DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME
         )
@@ -398,6 +399,9 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
+        if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME not in self.df.columns:
+            error = "Location column is missing while `weather` feature is enabled."
+            raise AttributeError(error)
         present_time = self.final_timestamp
         self.df, self.added_columns["weather"] = enrich_weather(
             self.df,
