@@ -1,7 +1,16 @@
-# U2 Time Series Prediction Final
+<div align="center"><img src="U2DEMO_logo.png" alt="U2Demo Logo" width="200px" /></div>
 
-This is the source code for the time series prediction algorithm used in the U2 Demo project. It is used to train models
-for the prediction of time series and perform inference on them.
+# U2 Time Series Prediction
+
+This document has been produced in the context of the U2Demo project. Views and opinions expressed in this document are
+however those of the authors only and do not necessarily reflect those of the European Union or the European Climate,
+Infrastructure and Environment Executive Agency (CINEA). Neither the European Union nor the granting authority can be
+held responsible for them. U2Demo has received funding from the European Union's Horizon Europe programme under grant
+agreement no. 101160684.
+
+This is the output of the forecasting algorithms developed in task 4.2. It is the source code for the time series
+prediction algorithm used in the U2 Demo project. It is used to train models for the prediction of time series and
+perform inference on them.
 
 Models trained with this application will contain custom metadata that is relevant to the specific nature of the U2
 demo project. This metadata will be read automatically when performing inference using this application. This ensures that
