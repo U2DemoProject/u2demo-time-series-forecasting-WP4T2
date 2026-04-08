@@ -7,6 +7,7 @@ authors = [
     {name = "Hubert Kriebitzsch", email = "hubert.kriebitzsch@eifer.org"}
 ]
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "torch (>=2.2,<2.8)",

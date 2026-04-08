@@ -1,0 +1,479 @@
+U2 Time Series Prediction
+Copyright 2026 European Institute for Energy Research
+
+This product is licensed under the Apache License, Version 2.0.
+You may not use this product except in compliance with the License.
+A copy of the License is included with this distribution as the LICENSE file.
+
+================================================================================
+Third-Party Notices
+================================================================================
+
+This product depends on third-party libraries. The following notices are
+reproduced as required by the terms of each dependency's respective license.
+
+--------------------------------------------------------------------------------
+-- Apache License 2.0 dependencies --
+-- (Section 4(d): NOTICE content must be reproduced in derivative works)       --
+--------------------------------------------------------------------------------
+
+Python Fire (fire)
+License: Apache License 2.0
+Homepage: https://github.com/google/python-fire
+Copyright 2017 Google LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Tenacity (tenacity)
+License: Apache License 2.0
+Homepage: https://github.com/jd/tenacity
+Copyright 2016-2021 Julien Danjou <julien@danjou.info>
+Copyright 2016-2021 Joshua Harlow
+Copyright 2013-2016 Ray Holder
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+PyTorch Lightning (lightning)
+License: Apache License 2.0
+Homepage: https://github.com/Lightning-AI/pytorch-lightning
+Copyright The Lightning AI team.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+AutoGluon (autogluon)
+License: Apache License 2.0
+Homepage: https://github.com/autogluon/autogluon
+Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+  AutoGluon includes components from additional open-source projects. Refer to
+  the AutoGluon repository (https://github.com/autogluon/autogluon) for the
+  complete list of third-party attributions.
+
+--------------------------------------------------------------------------------
+-- BSD / MIT dependencies --
+-- (Copyright notices preserved for reference; no NOTICE reproduction          --
+--  required under Apache 2.0 for these licenses)                              --
+--------------------------------------------------------------------------------
+
+PyTorch (torch)
+License: BSD 3-Clause
+Homepage: https://github.com/pytorch/pytorch
+Copyright (c) 2016-present Facebook, Inc.
+
+NumPy (numpy)
+License: BSD 3-Clause
+Homepage: https://github.com/numpy/numpy
+Copyright (c) 2005-2024, NumPy Developers.
+
+pandas (pandas)
+License: BSD 3-Clause
+Homepage: https://github.com/pandas-dev/pandas
+Copyright (c) 2008-2011, AQR Capital Management, LLC, Lambda Foundry, Inc.
+and PyData Development Team.
+Copyright (c) 2011-2024, Open source contributors.
+
+geopy (geopy)
+License: MIT
+Homepage: https://github.com/geopy/geopy
+Copyright (c) 2006-2024 geopy authors.
+
+python-dotenv (python-dotenv)
+License: BSD 3-Clause
+Homepage: https://github.com/theskumar/python-dotenv
+Copyright (c) 2014, Saurabh Kumar.
+
+joblib (joblib)
+License: BSD 3-Clause
+Homepage: https://github.com/joblib/joblib
+Copyright (c) 2008-2021, The joblib developers.
+
+================================================================================
+Additional Third-Party Notices (transitive dependencies from requirements.txt)
+================================================================================
+
+The following packages are pulled in as transitive dependencies and are also
+licensed under the Apache License 2.0. Their NOTICE content is reproduced below
+as required by Apache 2.0 §4(d).
+
+--------------------------------------------------------------------------------
+
+absl-py (absl-py)
+License: Apache License 2.0
+Homepage: https://github.com/abseil/abseil-py
+Copyright 2017 The Abseil Authors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Accelerate (accelerate)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/accelerate
+Copyright 2021 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+CatBoost (catboost)
+License: Apache License 2.0
+Homepage: https://github.com/catboost/catboost
+Copyright 2017 Yandex LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Chronos Forecasting (chronos-forecasting)
+License: Apache License 2.0
+Homepage: https://github.com/amazon-science/chronos-forecasting
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Datasets (datasets)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/datasets
+Copyright 2020 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Evaluate (evaluate)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/evaluate
+Copyright 2022 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+GluonTS (gluonts)
+License: Apache License 2.0
+Homepage: https://github.com/awslabs/gluonts
+Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Google API Core (google-api-core)
+License: Apache License 2.0
+Homepage: https://github.com/googleapis/python-api-core
+Copyright 2017 Google LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Google Auth Library (google-auth)
+License: Apache License 2.0
+Homepage: https://github.com/googleapis/google-auth-library-python
+Copyright 2014 Google Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+googleapis-common-protos (googleapis-common-protos)
+License: Apache License 2.0
+Homepage: https://github.com/googleapis/python-api-common-protos
+Copyright 2021 Google LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+gRPC (grpcio)
+License: Apache License 2.0
+Homepage: https://github.com/grpc/grpc
+Copyright 2014 gRPC authors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Hugging Face Hub (huggingface-hub)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/huggingface_hub
+Copyright 2019 The HuggingFace Team.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Lightning Utilities (lightning-utilities)
+License: Apache License 2.0
+Homepage: https://github.com/Lightning-AI/utilities
+Copyright The Lightning AI team.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+MLForecast (mlforecast)
+License: Apache License 2.0
+Homepage: https://github.com/Nixtla/mlforecast
+Copyright 2022 Nixtla.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+OpenCensus (opencensus, opencensus-context)
+License: Apache License 2.0
+Homepage: https://github.com/census-instrumentation/opencensus-python
+Copyright 2018 Google LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+OpenTelemetry (opentelemetry-api, opentelemetry-sdk, opentelemetry-proto,
+               opentelemetry-exporter-prometheus, opentelemetry-semantic-conventions)
+License: Apache License 2.0
+Homepage: https://github.com/open-telemetry/opentelemetry-python
+Copyright The OpenTelemetry Authors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Parameter-Efficient Fine-Tuning (peft)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/peft
+Copyright 2023 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+proto-plus (proto-plus)
+License: Apache License 2.0
+Homepage: https://github.com/googleapis/proto-plus-python
+Copyright 2020 Google LLC.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+PyArrow (pyarrow)
+License: Apache License 2.0
+Homepage: https://github.com/apache/arrow
+Copyright 2016-present The Apache Software Foundation.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+  This product includes software developed at The Apache Software Foundation
+  (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+PyTorch Lightning (pytorch-lightning)
+License: Apache License 2.0
+Homepage: https://github.com/Lightning-AI/pytorch-lightning
+Copyright The Lightning AI team.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Ray (ray)
+License: Apache License 2.0
+Homepage: https://github.com/ray-project/ray
+Copyright 2017 The Ray Authors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Safetensors (safetensors)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/safetensors
+Copyright 2022 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+StatsForecast (statsforecast)
+License: Apache License 2.0
+Homepage: https://github.com/Nixtla/statsforecast
+Copyright 2022 Nixtla.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+TensorBoard (tensorboard, tensorboard-data-server)
+License: Apache License 2.0
+Homepage: https://github.com/tensorflow/tensorboard
+Copyright 2017 The TensorFlow Authors. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+pytorch-image-models (timm)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/pytorch-image-models
+Copyright 2019 Ross Wightman.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Tokenizers (tokenizers)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/tokenizers
+Copyright 2019 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+TorchMetrics (torchmetrics)
+License: Apache License 2.0
+Homepage: https://github.com/Lightning-AI/torchmetrics
+Copyright The Lightning AI team.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Transformers (transformers)
+License: Apache License 2.0
+Homepage: https://github.com/huggingface/transformers
+Copyright 2018 The HuggingFace Team. All rights reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+UtilsForecast (utilsforecast)
+License: Apache License 2.0
+Homepage: https://github.com/Nixtla/utilsforecast
+Copyright 2022 Nixtla.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+CoreForecast (coreforecast)
+License: Apache License 2.0
+Homepage: https://github.com/Nixtla/coreforecast
+Copyright 2023 Nixtla.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+XGBoost (xgboost)
+License: Apache License 2.0
+Homepage: https://github.com/dmlc/xgboost
+Copyright (c) 2014-2024 by XGBoost Contributors.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Fugue (fugue)
+License: Apache License 2.0
+Homepage: https://github.com/fugue-project/fugue
+Copyright 2021 Fugue Technologies Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+Triad (triad)
+License: Apache License 2.0
+Homepage: https://github.com/fugue-project/triad
+Copyright 2021 Fugue Technologies Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this software except in compliance with the License. You may obtain a
+  copy of the License at http://www.apache.org/licenses/LICENSE-2.0
