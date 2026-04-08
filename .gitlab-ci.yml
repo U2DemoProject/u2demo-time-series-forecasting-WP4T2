@@ -3,91 +3,121 @@ stages:
   - test
 
 variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   POETRY_VERSION: "2.2.1"
   POETRY_NO_INTERACTION: "1"
   POETRY_VIRTUALENVS_IN_PROJECT: "true"
 
-# Cache configuration for faster builds
-cache:
-  key:
-    files:
-      - poetry.lock
-  paths:
-    - .cache/pip
-    - .venv
-
-
-.lint_light:
-  image: python:3.12-slim
-  tags:
-    - kvm_runner_1
-
 
 .python_base:
   image: python:3.12-slim
+  cache:
+    key:
+      files:
+        - poetry.lock
+      prefix: "v$POETRY_VERSION"
+    paths:
+      - .poetry-home
+      - .venv
+  before_script:
+    - |
+      if [ ! -f .poetry-home/bin/poetry ]; then
+        python -m venv .poetry-home
+        .poetry-home/bin/pip install poetry==$POETRY_VERSION poetry-plugin-export --quiet
+      fi
+    - export PATH="$CI_PROJECT_DIR/.poetry-home/bin:$PATH"
+    - poetry install --no-root
   tags:
     - kvm_runner_1
-  before_script:
-    - pip install poetry==$POETRY_VERSION
-    - poetry install --no-root
+
 
 
 # lint conventional commits
-validate_commits:
-  image: alpine:3.21
+commitlint:
+  image: python:3.12-alpine
   stage: lint
-  tags: 
+  tags:
     - kvm_runner_1
   only:
     - merge_request
-
+  cache: []
+  before_script:
+    - apk add --no-cache git
+    - GITLINT_VERSION=$(grep -A1 '^name = "gitlint"' poetry.lock | grep version | cut -d'"' -f2)
+    - pip install "gitlint==$GITLINT_VERSION" --quiet
   script:
     - |
-      # Since branches are squashed on merge, we only check the merge commit message
-      # This will be the most recent commit on the development branch
-      
-      echo "Checking MR title: $CI_MERGE_REQUEST_TITLE"
-      
-      if ! echo "$CI_MERGE_REQUEST_TITLE" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"; then
-        echo "ERROR: MR title does not follow conventional commits format:"
-        echo "  '$CI_MERGE_REQUEST_TITLE'"
+      echo "Checking MR title: \"$CI_MERGE_REQUEST_TITLE\""
+      echo ""
+      if ! echo "$CI_MERGE_REQUEST_TITLE" | gitlint; then
         echo ""
-        echo "Expected format: <type>(<scope>): <subject>"
-        echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+        echo "═══════════════════════════════════════════════════════════════════"
+        echo "MR title must follow Conventional Commits format:"
+        echo ""
+        echo "  type(scope): description"
         echo ""
         echo "Examples:"
-        echo "  feat(api): add user authentication"
-        echo "  fix: resolve database connection issue"
-        echo "  docs: update installation guide"
+        echo "  feat(api): add user authentication endpoint"
+        echo "  fix(parser): handle empty input gracefully"
+        echo "  docs: update installation instructions"
+        echo ""
+        echo "Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+        echo "Scope is optional. Description should be lowercase and not end with a period."
+        echo ""
+        echo "To fix: Edit your MR title in GitLab to match this format."
+        echo "═══════════════════════════════════════════════════════════════════"
         exit 1
       fi
-      
-      echo "✓ Merge commit follows conventional commits format"
+
 
 # Enforce ruff check
 ruff_check:
-  extends: .lint_light
+  image: python:3.12-alpine
   stage: lint
+  tags:
+    - kvm_runner_1
   only:
     - merge_request
+  cache: []
   before_script:
-    - pip install ruff
+    - RUFF_VERSION=$(grep -A1 '^name = "ruff"' poetry.lock | grep version | cut -d'"' -f2)
+    - pip install "ruff==$RUFF_VERSION" --quiet
   script:
     - ruff check
     - echo "✓ Ruff check passed with no errors"
 
 # Run ruff format
 ruff_format:
-  extends: .lint_light
+  image: python:3.12-alpine
   stage: lint
+  tags:
+    - kvm_runner_1
   only:
     - merge_request
+  cache: []
   before_script:
-    - pip install ruff
+    - RUFF_VERSION=$(grep -A1 '^name = "ruff"' poetry.lock | grep version | cut -d'"' -f2)
+    - pip install "ruff==$RUFF_VERSION" --quiet
   script:
     - ruff format --check
     - echo "✓ Code formatting is correct"
+
+# Check poetry.lock is in sync with pyproject.toml
+poetry_lock:
+  image: python:3.12-alpine
+  stage: lint
+  tags:
+    - kvm_runner_1
+  only:
+    - merge_request
+  cache:
+    key: "poetry-$POETRY_VERSION"
+    paths:
+      - .cache/pip
+  before_script:
+    - pip install poetry==$POETRY_VERSION
+  script:
+    - poetry check --lock
+
 
 # Run tests 
 test:
