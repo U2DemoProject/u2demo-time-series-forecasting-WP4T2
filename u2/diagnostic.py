@@ -1,6 +1,6 @@
 import torch
 
-from .logging_config import logger
+from u2.logging_config import logger
 
 
 def sanity_check() -> None:

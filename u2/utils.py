@@ -1,11 +1,11 @@
-import os
-
 import requests
 from geopy.geocoders import Nominatim
 from joblib import Memory
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-memory = Memory(location=os.getenv("CACHE_DIR", ".cache"), verbose=0)
+from u2.defaults import CACHE_DIR, NOMINATIM_DOMAIN, NOMINATIM_USER_AGENT_NAME
+
+memory = Memory(location=CACHE_DIR, verbose=0)
 
 
 def is_retryable_error(exception: BaseException) -> bool:
@@ -40,20 +40,20 @@ def is_retryable_error(exception: BaseException) -> bool:
     reraise=True,
 )
 @memory.cache
-def geocode(place_name: str) -> dict:
+def reverse_geocode(latlon: tuple[float, float]) -> dict:
     """
-    Geocode a place name using Nominatim and return country, region, and coordinates.
+    Reverse geocode a latitude/longitude pair using Nominatim and return country, region, and coordinates.
 
     This function:
-    - Queries the Nominatim geocoding service for the given place name.
+    - Queries the Nominatim geocoding service for the given latitude/longitude pair.
     - Extracts country code, sub-region code, latitude, and longitude.
     - Caches results on disk to avoid repeated lookups.
     - Retries failed requests (e.g., HTTP 429 or 504) using exponential backoff.
 
     Parameters
     ----------
-    place_name : str
-        A human-readable place name (e.g., "Berlin", "New York City").
+    latlon : tuple[float, float]
+        A tuple containing latitude and longitude coordinates.
 
     Returns
     -------
@@ -74,14 +74,13 @@ def geocode(place_name: str) -> dict:
     """
     ret = {}
 
-    geolocator = Nominatim(user_agent=os.getenv("NOMINATIM_USER_AGENT_NAME"))
-    location = geolocator.geocode(place_name, addressdetails=True)
+    geolocator = Nominatim(domain=NOMINATIM_DOMAIN, user_agent=NOMINATIM_USER_AGENT_NAME)
+    location = geolocator.reverse(latlon, addressdetails=True)
     if location is None:
-        raise ValueError(f"Could not geocode location: {place_name}")
+        raise ValueError(f"Could not geocode location: {latlon}")
 
     address = location.raw.get("address", {})
     ret["country_code"], ret["region_code"] = address.get("country_code", None), address.get("ISO3166-2-lvl4", None)
-    ret["latitude"], ret["longitude"] = location.latitude, location.longitude
 
     return ret
 
@@ -128,9 +127,9 @@ def get_known_covariates(time_series_added_columns: dict[str, list[str]], horizo
     return known_covariates
 
 
-def get_min_group_length(lags: list[int], min_lookback: int) -> int:
+def get_min_timeseries_length(lags: list[int], min_lookback: int, horizon: int | None = None) -> int:
     """
-    Gets the minimum group length to have min_lookback steps after adding lags.
+    Gets the minimum time-series length to have min_lookback steps after adding lags.
 
     Parameters
     ----------
@@ -138,11 +137,14 @@ def get_min_group_length(lags: list[int], min_lookback: int) -> int:
         List of lag features to be added.
     min_lookback : int
         Minimum amount of steps of historical data to have.
+    horizon : int | None
+        Forecast horizon (number of future steps to predict).
+        To account for test_window when training.
 
     Returns
     -------
     int
-        The minimum group length expected.
+        The minimum time-series length expected.
 
     """
-    return max(lags) + min_lookback
+    return max(lags) + min_lookback + (horizon or 0)

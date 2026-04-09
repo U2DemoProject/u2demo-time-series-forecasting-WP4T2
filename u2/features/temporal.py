@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import FunctionTransformer, SplineTransformer
 
+from u2.defaults import TIME_SERIES_TIMESTAMP_COLUMN_NAME
+
 
 def sin_transformer(period: int) -> FunctionTransformer:
     """
@@ -171,7 +173,9 @@ def add_day_of_year_spline(df: pd.DataFrame, period: int, datetime_col: str = "t
     return pd.concat([df, doy_spline], axis=1)
 
 
-def add_encoded_time_features(df: pd.DataFrame, datetime_col: str = "timestamp") -> tuple[pd.DataFrame, list[str]]:
+def add_encoded_time_features(
+    df: pd.DataFrame, datetime_col: str = TIME_SERIES_TIMESTAMP_COLUMN_NAME
+) -> tuple[pd.DataFrame, list[str]]:
     """
     Add multiple time-derived features to a DataFrame.
 
@@ -186,7 +190,7 @@ def add_encoded_time_features(df: pd.DataFrame, datetime_col: str = "timestamp")
     df : pandas.DataFrame
         Input DataFrame with a datetime column.
     datetime_col : str, optional
-        Name of the datetime column. Defaults to "timestamp".
+        Name of the datetime column. Defaults to TIME_SERIES_TIMESTAMP_COLUMN_NAME.
 
     Returns
     -------
@@ -201,7 +205,7 @@ def add_encoded_time_features(df: pd.DataFrame, datetime_col: str = "timestamp")
         lambda df: add_sin_cos_feature(df, df[datetime_col].dt.month, period=12, prefix="month"),
     ]
 
-    if df["timestamp"].diff().mode()[0] <= pd.Timedelta("1 hour"):
+    if df[datetime_col].diff().mode()[0] <= pd.Timedelta("1 hour"):
         feature_steps.append(lambda df: add_sin_cos_feature(df, df[datetime_col].dt.hour, period=24, prefix="hour"))
 
     for step in feature_steps:

@@ -142,6 +142,7 @@ class LagFeatureGenerator:
         """
         return (
             self.df.groupby(self.group_name)
-            .apply(lambda g: g.iloc[self._max_shift :], include_groups=True)
+            .apply(lambda g: g.iloc[self._max_shift :], include_groups=False)
+            .reset_index(level=0)
             .reset_index(drop=True)
         ), self.added_columns

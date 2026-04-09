@@ -1,13 +1,14 @@
 import logging
-import os
+
+from u2.defaults import LOG_LEVEL
 
 # Create a logger
 logger = logging.getLogger("U2 Time Series Prediction")
-logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+logger.setLevel(LOG_LEVEL)
 
 # Create a console handler and set its level to INFO
 ch = logging.StreamHandler()
-ch.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+ch.setLevel(LOG_LEVEL)
 
 # Create a formatter and set it for the handler
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

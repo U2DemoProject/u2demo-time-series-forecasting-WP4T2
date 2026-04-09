@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Time Series Prediction Algorithm Implementation for U2 Demo Project"
 authors = [
     {name = "Isaac Boates",email = "isaac.boates@eifer.org"},
-    {name = "Hubert Kriebitzsch", email = "hubert.kriebitzsch@eifer.org"}
+    {name = "Maxime Gatineau",email = "maxime.gatineau@eifer.org"},
+    {name = "Hubert Kriebitzsch", email = "hubert.kriebitzsch@eifer.org"},
+    {name = "Jaisiel Santana",email = "jaisiel.santana@eifer.org"}
 ]
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -20,6 +22,7 @@ dependencies = [
     "joblib (>=1.5.2,<2.0.0)",
     "lightning (==2.5.1)",
     "autogluon (>=1.5.0,<2.0.0)",
+    "pydantic (>=2.12.5,<3.0.0)",
 ]
 
 

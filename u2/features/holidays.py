@@ -1,15 +1,13 @@
-import os
-
 import pandas as pd
 import requests
 from joblib import Memory
 from sklearn.preprocessing import MultiLabelBinarizer
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.defaults import DEFAULT_HOLIDAY_TYPES
-from u2.utils import geocode, is_retryable_error
+from u2.defaults import CACHE_DIR, DEFAULT_HOLIDAY_TYPES, PUBLIC_HOLIDAY_API_URL
+from u2.utils import is_retryable_error, reverse_geocode
 
-memory = Memory(location=os.getenv("CACHE_DIR", ".cache"), verbose=0)
+memory = Memory(location=CACHE_DIR, verbose=0)
 
 
 @retry(
@@ -47,7 +45,7 @@ def fetch_holidays_by_year(country_code: str, year: str) -> pd.DataFrame:
         If the HTTP request fails after retries.
 
     """
-    api_url = f"{os.getenv('PUBLIC_HOLIDAY_API_URL')}/publicholidays/{year}/{country_code}"
+    api_url = f"{PUBLIC_HOLIDAY_API_URL}/publicholidays/{year}/{country_code}"
     response = requests.get(api_url)
     response.raise_for_status()
     return pd.DataFrame(response.json())
@@ -85,7 +83,7 @@ def encode_holiday_types(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
 
 def merge_holidays_with_dataframe(
-    df: pd.DataFrame, place_name: str, datetime_column: str = "timestamp"
+    df: pd.DataFrame, latlon: tuple[float, float], datetime_column: str = "timestamp"
 ) -> pd.DataFrame:
     """
     Add holiday indicator features to a DataFrame based on dates and a geocoded place.
@@ -103,16 +101,18 @@ def merge_holidays_with_dataframe(
     ----------
     df : pandas.DataFrame
         Input DataFrame with at least one datetime column.
-    place_name : str
-        Human-readable name (e.g., city, region) used for geocoding.
+    latlon : tuple[float, float]
+        Latitude and longitude coordinates used for geocoding the place.
     datetime_column : str, optional
         Name of the datetime64 column used for merging by date.
         Defaults to "timestamp".
 
     Returns
     -------
-    pandas.DataFrame
-        A copy of the input DataFrame augmented with one-hot holiday columns.
+    tuple[pandas.DataFrame, list[str]]
+        A tuple containing:
+        - The merged DataFrame with holiday features
+        - List of holiday feature column names (`holiday_<type>`)
 
     """
     date_column = "date"
@@ -121,7 +121,7 @@ def merge_holidays_with_dataframe(
     df[date_column] = df[datetime_column].dt.date
     df[year_column] = df[datetime_column].dt.year
 
-    geocode_result = geocode(place_name)
+    geocode_result = reverse_geocode(latlon)
     country_code, region_code = geocode_result["country_code"], geocode_result["region_code"]
 
     holidays = pd.concat([fetch_holidays_by_year(country_code, str(year)) for year in df[year_column].unique()])
@@ -139,53 +139,4 @@ def merge_holidays_with_dataframe(
     merged_df.drop(columns=[date_column, year_column], inplace=True)
 
     merged_df[holiday_columns] = merged_df[holiday_columns].fillna(0).astype(int)
-    return merged_df
-
-
-def merge_holidays_for_multiple_places(
-    df: pd.DataFrame, location_col: str, datetime_column: str = "timestamp"
-) -> tuple[pd.DataFrame, list[str]]:
-    """
-    Merge holiday features for a dataset containing multiple unique locations.
-
-    This function:
-    - Splits the DataFrame by each unique place in `location_col`
-    - Applies `merge_holidays_with_dataframe` independently per place
-    - Concatenates the results back into a unified DataFrame
-    - Restores the original row order
-    - Returns the merged dataset and the list of expected holiday feature columns
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input DataFrame containing multiple places.
-    location_col : str
-        Column name identifying the location for each row.
-    datetime_column : str, optional
-        Datetime column used to derive holiday dates. Defaults to "timestamp".
-
-    Returns
-    -------
-    tuple[pandas.DataFrame, list[str]]
-        A tuple containing:
-        - The merged DataFrame with holiday features
-        - List of holiday feature column names (`holiday_<type>`)
-
-    """
-    # To preserve order, keep an index column
-    df = df.copy()
-    df["_orig_index"] = df.index
-
-    dfs = []
-    for place in df[location_col].unique():
-        sub_df = df[df[location_col] == place].copy()
-        sub_df_merged = merge_holidays_with_dataframe(sub_df, place, datetime_column=datetime_column)
-        dfs.append(sub_df_merged)
-
-    # Concatenate all sub-dataframes
-    merged_df = pd.concat(dfs)
-
-    # Restore original order
-    return merged_df.sort_values("_orig_index").drop(columns="_orig_index"), [
-        f"holiday_{t.lower()}" for t in DEFAULT_HOLIDAY_TYPES
-    ]
+    return merged_df, [f"holiday_{t.lower()}" for t in DEFAULT_HOLIDAY_TYPES]

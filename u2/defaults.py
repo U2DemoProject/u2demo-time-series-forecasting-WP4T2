@@ -1,18 +1,35 @@
-DEFAULT_NOMINATIM_USER_AGENT_NAME = "U2 Demo Time Series Prediction"
-DEFAULT_OUTPUT_PREDICTION_PATH = "./output"
-DEFAULT_MODEL_TRAINING_RESULT_LEADERBOARD_PATH = "u2/training_result_leaderboard.csv"
-DEFAULT_MODEL_METADATA_PATH = "u2/metadata.json"
+import os
 
-DEFAULT_TIME_SERIES_FEATURES = ["temporal", "lag", "holiday", "weather"]
-DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME = "timestamp"
-DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME = "value"
-DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME = "item_id"
-DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME = "location"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+CACHE_DIR = os.getenv("CACHE_DIR", ".cache")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+NOMINATIM_DOMAIN = os.getenv("NOMINATIM_DOMAIN", "nominatim.openstreetmap.org")
+NOMINATIM_USER_AGENT_NAME = os.getenv("NOMINATIM_USER_AGENT_NAME", "U2 Demo Time Series Prediction")
+
+PUBLIC_HOLIDAY_API_URL = os.getenv("PUBLIC_HOLIDAY_API_URL", "https://date.nager.at/api/v3")
+
+WEATHER_HISTORICAL_API_URL = os.getenv("WEATHER_HISTORICAL_API_URL", "https://archive-api.open-meteo.com/v1/archive")
+WEATHER_FORECAST_API_URL = os.getenv("WEATHER_FORECAST_API_URL", "https://api.open-meteo.com/v1/forecast")
+
+OUTPUT_PREDICTION_PATH = os.getenv("OUTPUT_PREDICTION_PATH", "./output")
+MODEL_PATH = os.getenv("MODEL_PATH", "./models")
+MODEL_TRAINING_RESULT_LEADERBOARD_PATH = os.getenv(
+    "MODEL_TRAINING_RESULT_LEADERBOARD_PATH", "u2/training_result_leaderboard.csv"
+)
+MODEL_METADATA_PATH = os.getenv("MODEL_METADATA_PATH", "u2/metadata.json")
+
+TIME_SERIES_TIMESTAMP_COLUMN_NAME = "time"
+TIME_SERIES_PREDICT_VALUE_COLUMN_NAME = "value"
+TIME_SERIES_GROUP_COLUMN_NAME = "item_id"
+
 DEFAULT_TRAIN_EVAL_METRIC = "WQL"
-DEFAULT_TRAIN_NUM_TEST_WINDOWS = 1
 DEFAULT_TRAIN_MIN_LOOKBACK = 1024
 
-TIMESTEPS_IN_WEEKLY_CYCLE = {"h": 168, "D": 7}
+AVAILABLE_FEATURES = ["temporal", "lag", "holiday", "weather"]
 
 DEFAULT_HOLIDAY_TYPES = [
     "Public",

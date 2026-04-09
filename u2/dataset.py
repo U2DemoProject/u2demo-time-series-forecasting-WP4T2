@@ -1,23 +1,22 @@
-import datetime as dt
-import os
 from typing import Self
 
 import pandas as pd
 from joblib import Memory
 
-from .defaults import (
-    DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
-    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
-    DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
-    DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
+from u2.data_models import ForecastInput, ForecastTrainingInput
+from u2.defaults import (
+    CACHE_DIR,
+    TIME_SERIES_GROUP_COLUMN_NAME,
+    TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
+    TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from .features.holidays import merge_holidays_for_multiple_places
-from .features.lag import LagFeatureGenerator
-from .features.temporal import add_encoded_time_features
-from .features.weather import enrich_weather
-from .logging_config import logger
+from u2.features.holidays import merge_holidays_with_dataframe
+from u2.features.lag import LagFeatureGenerator
+from u2.features.temporal import add_encoded_time_features
+from u2.features.weather import enrich_weather
+from u2.logging_config import logger
 
-memory = Memory(location=os.getenv("CACHE_DIR", ".cache"), verbose=0)
+memory = Memory(location=CACHE_DIR, verbose=0)
 
 
 class U2TimeSeriesPredictionDataset:
@@ -47,76 +46,63 @@ class U2TimeSeriesPredictionDataset:
         Timedelta equivalent of the inferred frequency.
     final_timestamp : pandas.Timestamp or None
         The latest timestamp across all groups in the dataset.
+    latlon : tuple[float, float] or None
+        Latitude and longitude coordinates for geocoding and weather features.
 
     """
 
     def __init__(self):
-        self.csv_name = None
         self.df = None
         self.future_df = None
         self.added_columns = {}
         self.freq = None
         self.freq_timedelta = None
+        self.freq_minutes = None
         self.final_timestamp = None
+        self.latlon = None
 
     @classmethod
-    def from_csv(  # noqa: PLR0912
-        cls,
-        time_series_csv: str,
-        location_col_name: str = DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
-        timestamp_col_name: str = DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
-        predict_value_col_name: str = DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
-        group_col_name: str = DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
-        *args,
-        **kwargs,
-    ) -> Self:
+    def from_training_input(cls, data: ForecastTrainingInput) -> Self:
         """
-        Load a multigroup time-series dataset from CSV and validate its structure.
-
-        This method:
-        - Reads the CSV into a DataFrame
-        - Ensures required columns (timestamp, value, location) exist
-        - Creates a default group column if missing
-        - Verifies that all groups share the same final timestamp
-        - Ensures all groups have a consistent inferred frequency ("h" or "D")
-        - Normalizes column names to U2 defaults
-        - Sorts rows for proper sequential processing
+        Create a dataset instance from a structured data model.
 
         Parameters
         ----------
-        time_series_csv : str
-            Path to the CSV file.
-        location_col_name : str, optional
-            Column name for the location identifier.
-        timestamp_col_name : str, optional
-            Column name for timestamps.
-        predict_value_col_name : str, optional
-            Column name for the target value.
-        group_col_name : str, optional
-            Column name for the grouping (item_id).
-        *args, **kwargs :
-            Additional arguments passed to `pandas.read_csv`.
+        data : ForecastTrainingInput
+            A structured data model containing time-series information, including
+            target series, exogenous series, and time parameters.
 
         Returns
         -------
         U2TimeSeriesPredictionDataset
-            A fully initialized dataset object.
+            A dataset instance initialized from the provided data model.
 
         Raises
         ------
-        AttributeError
-            If required columns are missing.
         ValueError
-            If all groups are dropped or group frequencies/final timestamps differ.
+            If the input data model is invalid or cannot be converted to a DataFrame.
 
         """
         obj = cls()
-        obj.csv_name = os.path.basename(time_series_csv)
-        obj.df = pd.read_csv(time_series_csv, *args, **kwargs)
+        target_df = pd.DataFrame.from_dict(
+            data=[value.model_dump() for value in data.target_series.training_values], orient="columns"
+        )
+        if data.exogenous_series:
+            exogenous_df = pd.concat(
+                [
+                    pd.DataFrame.from_dict(
+                        data=[value.model_dump() for value in exog_series.training_values], orient="columns"
+                    )
+                    .rename(columns={"value": exog_series.variable_name})
+                    .set_index(TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+                    for exog_series in data.exogenous_series
+                ],
+                axis=1,
+            ).reset_index()
 
-        if timestamp_col_name not in obj.df.columns or predict_value_col_name not in obj.df.columns:
-            error = f"One of `{timestamp_col_name}` and/or `{predict_value_col_name}` columns are missing."
-            raise AttributeError(error)
+            obj.df = pd.merge(target_df, exogenous_df, how="left", on=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+        else:
+            obj.df = target_df
 
         if obj.df.empty:
             error = "The input data is empty."
@@ -126,83 +112,116 @@ class U2TimeSeriesPredictionDataset:
             error = "The input data contains NaN values."
             raise ValueError(error)
 
-        # Force timestamp column to datetime type
-        obj.df[timestamp_col_name] = pd.to_datetime(obj.df[timestamp_col_name])
+        obj.df[TIME_SERIES_GROUP_COLUMN_NAME] = 0
 
-        if group_col_name not in obj.df.columns:
-            logger.warning(
-                f"`{group_col_name}` column is not present in time series CSV `{time_series_csv}`, assuming all values belong to a single group."
-            )
-            obj.df[group_col_name] = 0
+        obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME] = obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].dt.tz_localize(None)
 
-        # All groups must have the same final timestamp
-        final_timestamps = set(obj.df.groupby(group_col_name)[timestamp_col_name].max().to_list())
-        if len(final_timestamps) > 1:
-            error = "Not all groups have the same final timestamp. Found values:"
-            for t in set(final_timestamps):
-                error += f"\n\t{t}"
-            logger.error(error)
+        freq = pd.infer_freq(obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME])
+        freq_minutes = int(pd.Timedelta(pd.tseries.frequencies.to_offset(freq=freq)).total_seconds() / 60)
+
+        if data.time_parameters.timestep_minutes is not None and data.time_parameters.timestep_minutes != freq_minutes:
+            error = f"Inferred time series frequency `{freq}` (`{freq_minutes}min`) does not match expected frequency `{data.time_parameters.timestep_minutes}min` based on time parameters."
             raise ValueError(error)
-        obj.final_timestamp = next(iter(final_timestamps))
+        obj.freq = freq
+        obj.freq_minutes = freq_minutes
+        obj.freq_timedelta = pd.to_timedelta(freq_minutes, unit="min")
 
-        # Get the frequency
-        # It should ALWAYS be "h" or "D", because the model is only ever trained on those two
-        # It must also be the same for all groups
-        group_freqs = (
-            obj.df.sort_values([group_col_name, timestamp_col_name])
-            .groupby(group_col_name)[timestamp_col_name]
-            .apply(pd.infer_freq)
-        )
-        unique_freqs = group_freqs.dropna().unique()
-        if len(unique_freqs) != 1:
-            error = f"Inconsistent inferred frequencies across groups: {group_freqs}"
-            logger.error(error)
-            raise ValueError(error)
-        obj.freq = unique_freqs[0]
-        obj.freq_timedelta = {"h": dt.timedelta(hours=1), "D": dt.timedelta(days=1)}[obj.freq]
-
-        # Rename columns if necessary
-        if timestamp_col_name != DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME:
-            obj.df = obj.df.rename(columns={timestamp_col_name: DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME})
-        if predict_value_col_name != DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME:
-            obj.df = obj.df.rename(columns={predict_value_col_name: DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME})
-        if group_col_name != DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME:
-            obj.df = obj.df.rename(columns={group_col_name: DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME})
-        if location_col_name != DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME:
-            obj.df = obj.df.rename(columns={location_col_name: DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME})
-
-        obj.df = obj.df.sort_values([DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME])
-
-        keep_cols = [
-            DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
-            DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
-            DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME,
-        ] + (
-            [DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME]
-            if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in obj.df.columns
-            else []
-        )
-
-        obj.df = obj.df[keep_cols]
+        obj.latlon = (data.location.latitude, data.location.longitude) if data.location else None
 
         return obj
 
-    def drop_short_groups(self, min_group_length: int) -> None:
+    @classmethod
+    def from_forecast_input(cls, data: ForecastInput) -> Self:
         """
-        Drop groups from the dataset that do not have enough rows for prediction.
-
-        For each group in the specified column:
-        - Counts the number of rows per group
-        - Identifies groups with fewer rows than `min_group_length`
-        - Logs a warning listing the dropped groups
-        - Removes rows belonging to these short groups from `self.df`
-        - Raises a ValueError if no groups remain after filtering
+        Create a dataset instance from a structured data model.
 
         Parameters
         ----------
-        min_group_length : int
-            Minimum number of rows required per group to keep it; groups with fewer
-            rows than `min_group_length` are dropped.
+        data : ForecastInput
+            A structured data model containing time-series information, including
+            target series, exogenous series, and time parameters.
+
+        Returns
+        -------
+        U2TimeSeriesPredictionDataset
+            A dataset instance initialized from the provided data model.
+
+        Raises
+        ------
+        ValueError
+            If the input data model is invalid or cannot be converted to a DataFrame.
+
+        """
+        obj = cls()
+        obj.df = pd.DataFrame.from_dict(
+            data=[value.model_dump() for value in data.target_series.historical_values], orient="columns"
+        )
+        obj.df[TIME_SERIES_GROUP_COLUMN_NAME] = 0
+        obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME] = obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].dt.tz_localize(None)
+
+        freq = pd.infer_freq(obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME])
+        freq_minutes = int(pd.Timedelta(pd.tseries.frequencies.to_offset(freq=freq)).total_seconds() / 60)
+
+        if data.time_parameters.timestep_minutes is not None and data.time_parameters.timestep_minutes != freq_minutes:
+            error = f"Inferred time series frequency `{freq}` (`{freq_minutes}min`) does not match expected frequency `{data.time_parameters.timestep_minutes}min` based on time parameters."
+            raise ValueError(error)
+
+        obj.freq = freq
+        obj.freq_minutes = freq_minutes
+        obj.freq_timedelta = pd.to_timedelta(freq_minutes, unit="min")
+
+        obj.final_timestamp = obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].max()
+        obj.latlon = (data.location.latitude, data.location.longitude) if data.location else None
+
+        if obj.df.isna().any().any():
+            error = "The input data contains NaN values."
+            raise ValueError(error)
+
+        obj.extend_by_horizon(data.time_parameters.horizon_hours * 60 // freq_minutes)
+
+        if data.exogenous_series:
+            exogenous_df = pd.concat(
+                [
+                    pd.DataFrame.from_dict(
+                        data=[value.model_dump() for value in exog_series.historical_values]
+                        + (
+                            [value.model_dump() for value in exog_series.future_values]
+                            if exog_series.future_values is not None
+                            else []
+                        ),
+                        orient="columns",
+                    )
+                    .rename(columns={"value": exog_series.variable_name})
+                    .set_index(TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+                    for exog_series in data.exogenous_series
+                ],
+                axis=1,
+            ).reset_index()
+
+            obj.df = pd.merge(obj.df, exogenous_df, how="left", on=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+
+        if obj.df.empty:
+            error = "The input data is empty."
+            raise ValueError(error)
+
+        return obj
+
+    def drop_short_timeseries(self, min_timeseries_length: int) -> None:
+        """
+        Drop time-series from the dataset that do not have enough rows for prediction/training.
+
+        For each group in the specified column:
+        - Counts the number of rows per time-series
+        - Identifies time-series with fewer rows than `min_timeseries_length`
+        - Logs a warning listing the dropped time-series
+        - Removes rows belonging to these short time-series from `self.df`
+        - Raises a ValueError if no time-series remain after filtering
+
+        Parameters
+        ----------
+        min_timeseries_length : int
+            Minimum number of rows required per time-series to keep it; time-series with fewer
+            rows than `min_timeseries_length` are dropped.
 
         Returns
         -------
@@ -211,20 +230,20 @@ class U2TimeSeriesPredictionDataset:
         Raises
         ------
         ValueError
-            If no group has enough rows to predict on.
+            If no time-series has enough rows to predict on.
 
         """
-        counts = self.df[DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME].value_counts()
-        dropped = counts[counts < min_group_length].index.tolist()
+        counts = self.df[TIME_SERIES_GROUP_COLUMN_NAME].value_counts()
+        dropped = counts[counts < min_timeseries_length].index.tolist()
         if dropped:
             logger.warning(
-                f"The following groups were dropped because they have too few rows to predict on (<{min_group_length}):"
+                f"The following groups were dropped because they have too few rows to predict on (<{min_timeseries_length}):"
             )
             for d in dropped:
                 logger.warning(f"\t{d}")
-            self.df = self.df[self.df[DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME].map(counts) >= min_group_length]
+            self.df = self.df[self.df[TIME_SERIES_GROUP_COLUMN_NAME].map(counts) >= min_timeseries_length]
         if self.df.empty:
-            error = "No group in the input CSV has enough rows to predict on."
+            error = f"No timeseries in the input has enough rows to predict/train on (must have >= {min_timeseries_length} observations)."
             logger.error(error)
             raise ValueError(error)
 
@@ -250,28 +269,18 @@ class U2TimeSeriesPredictionDataset:
 
         """
         frames = []
-        for item_id, subdf in self.df.groupby(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME):
-            last_ts = subdf[DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME].iloc[-1]
+        for item_id, subdf in self.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME):
+            last_ts = subdf[TIME_SERIES_TIMESTAMP_COLUMN_NAME].iloc[-1]
 
             # Create horizon new timestamps
             new_timestamps = [last_ts + self.freq_timedelta * (i + 1) for i in range(horizon)]
 
             blank = {
-                DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME: item_id,
-                DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME: new_timestamps,
+                TIME_SERIES_GROUP_COLUMN_NAME: item_id,
+                TIME_SERIES_TIMESTAMP_COLUMN_NAME: new_timestamps,
             }
 
-            # Each group keeps its own location
-            if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME in subdf.columns:
-                location_value = subdf[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME].iloc[0]
-                blank[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME] = location_value
-
             blank = pd.DataFrame(blank)
-
-            # Other columns should remain blank → add them as NaN automatically
-            missing_cols = [c for c in self.df.columns if c not in blank.columns]
-            for col in missing_cols:
-                blank[col] = pd.NA
 
             frames.append(pd.concat([subdf, blank], ignore_index=True))
 
@@ -297,13 +306,11 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and `self.future_df` in place.
 
         """
-        self.df = self.df.sort_values(
-            [DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME]
-        )
+        self.df = self.df.sort_values([TIME_SERIES_GROUP_COLUMN_NAME, TIME_SERIES_TIMESTAMP_COLUMN_NAME])
         remaining_frames = []
         future_frames = []
 
-        for _item_id, subdf in self.df.groupby(DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME, group_keys=False):
+        for _item_id, subdf in self.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME, group_keys=False):
             # Split this group's data
             future_part = subdf.tail(horizon)
             remaining_part = subdf.iloc[:-horizon] if len(subdf) > horizon else subdf.iloc[0:0]
@@ -352,9 +359,9 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
-        lag_gen = LagFeatureGenerator(self.df, DEFAULT_TIME_SERIES_GROUP_COLUMN_NAME)
+        lag_gen = LagFeatureGenerator(self.df, TIME_SERIES_GROUP_COLUMN_NAME)
         # Up to now lags have only ever been calculated on the value column
-        target_columns = [DEFAULT_TIME_SERIES_PREDICT_VALUE_COLUMN_NAME]
+        target_columns = [TIME_SERIES_PREDICT_VALUE_COLUMN_NAME]
         for col in target_columns:
             lag_gen.create_lag_features(col, lags=lags)
             lag_gen.create_rolling_stat_features(col, windows=windows)
@@ -364,9 +371,12 @@ class U2TimeSeriesPredictionDataset:
         """
         Merge holiday indicators into the dataset for all locations.
 
-        Uses `merge_holidays_for_multiple_places` to:
-        - Identify holidays for each location
-        - Add binary/encoded holiday features
+        Uses `merge_holidays_with_dataframe` to add binary/encoded holiday features
+
+        Parameters
+        ----------
+        latlon : tuple[float, float]
+            Latitude and longitude coordinates used for geocoding the places in the dataset.
 
         Returns
         -------
@@ -374,11 +384,11 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
-        if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME not in self.df.columns:
-            error = "Location column is missing while `holiday` feature is enabled."
+        if self.latlon is None:
+            error = "Location information is required to add `holiday` features but is missing in the dataset."
             raise AttributeError(error)
-        self.df, self.added_columns["holiday"] = merge_holidays_for_multiple_places(
-            self.df, DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME, DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME
+        self.df, self.added_columns["holiday"] = merge_holidays_with_dataframe(
+            self.df, self.latlon, TIME_SERIES_TIMESTAMP_COLUMN_NAME
         )
 
     def add_weather(self) -> None:
@@ -399,14 +409,14 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
-        if DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME not in self.df.columns:
-            error = "Location column is missing while `weather` feature is enabled."
+        if self.latlon is None:
+            error = "Location information is required to add `weather` features but is missing in the dataset."
             raise AttributeError(error)
-        present_time = self.final_timestamp
+
         self.df, self.added_columns["weather"] = enrich_weather(
             self.df,
-            DEFAULT_TIME_SERIES_TIMESTAMP_COLUMN_NAME,
-            DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
-            present_time,
+            TIME_SERIES_TIMESTAMP_COLUMN_NAME,
+            self.latlon,
+            self.final_timestamp,
             self.freq,
         )

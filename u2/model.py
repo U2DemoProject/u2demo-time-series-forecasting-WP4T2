@@ -7,16 +7,15 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from autogluon.timeseries.metrics import WAPE
 
-from u2.utils import get_min_group_length
-
-from . import __version__
-from .dataset import U2TimeSeriesPredictionDataset
-from .defaults import (
-    DEFAULT_MODEL_METADATA_PATH,
-    DEFAULT_MODEL_TRAINING_RESULT_LEADERBOARD_PATH,
-    DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME,
+from u2 import __version__
+from u2.dataset import U2TimeSeriesPredictionDataset
+from u2.defaults import (
+    MODEL_METADATA_PATH,
+    MODEL_TRAINING_RESULT_LEADERBOARD_PATH,
+    TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from .logging_config import logger
+from u2.logging_config import logger
+from u2.utils import get_min_timeseries_length
 
 
 class U2TimeSeriesPredictionModel:
@@ -91,12 +90,13 @@ class U2TimeSeriesPredictionModel:
         # Reorder columns to match the original leaderboard order
         original_cols = leaderboards[0].columns
         avg_lb = avg_lb.reindex(columns=[col for col in original_cols if col in avg_lb.columns])
-        avg_lb.to_csv(f"{self.model_path}/{DEFAULT_MODEL_TRAINING_RESULT_LEADERBOARD_PATH}", index=None)
+        avg_lb.to_csv(f"{self.model_path}/{MODEL_TRAINING_RESULT_LEADERBOARD_PATH}", index=None)
 
     def _save_metadata(
         self,
         time_series: U2TimeSeriesPredictionDataset,
         min_lookback: int,
+        num_val_windows: int,
         num_test_windows: int,
         training_start: str,
         training_kwargs: dict,
@@ -110,6 +110,8 @@ class U2TimeSeriesPredictionModel:
             Dataset used for training, providing frequency and added columns.
         min_lookback : int
             Minimum lookback used to form the backtest split.
+        num_val_windows : int
+            Number of backtest cutoffs used for validation.
         num_test_windows : int
             Number of backtest cutoffs used for evaluation.
         training_start : str
@@ -129,10 +131,10 @@ class U2TimeSeriesPredictionModel:
         metadata = {
             "version": __version__,
             "training": {
-                "csv_name": time_series.csv_name,
                 "start_utc": training_start,
                 "end_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
                 "min_lookback": min_lookback,
+                "num_val_windows": num_val_windows,
                 "num_test_windows": num_test_windows,
                 "kwargs": training_kwargs,
             },
@@ -152,14 +154,20 @@ class U2TimeSeriesPredictionModel:
             metadata["windows"] = windows
         else:
             lags = [0]
-        metadata["min_group_length"] = get_min_group_length(lags=lags, min_lookback=min_lookback)
+        metadata["min_timeseries_length"] = get_min_timeseries_length(lags=lags, min_lookback=min_lookback)
 
-        with open(f"{self.model_path}/{DEFAULT_MODEL_METADATA_PATH}", "w") as f:
+        with open(f"{self.model_path}/{MODEL_METADATA_PATH}", "w") as f:
             json.dump(metadata, f, indent=4)
         self.metadata = metadata
 
     def new(
-        self, target_column: str, known_covariates_names: list[str], prediction_length: int, freq: str, eval_metric: str
+        self,
+        target_column: str,
+        known_covariates_names: list[str],
+        prediction_length: int,
+        freq: str,
+        eval_metric: str,
+        quantile_levels: list[float] = None,
     ) -> None:
         """
         Create a new predictor instance at `model_path` with the given settings.
@@ -176,6 +184,8 @@ class U2TimeSeriesPredictionModel:
             Frequency string (e.g., "h", "D").
         eval_metric : str
             AutoGluon evaluation metric to optimize during training.
+        quantile_levels : list[float], optional
+            List of quantile levels for quantile regression models (e.g., [0.1, 0.5, 0.9]). Defaults to None.
 
         Returns
         -------
@@ -191,6 +201,7 @@ class U2TimeSeriesPredictionModel:
             prediction_length=prediction_length,
             freq=freq,
             eval_metric=eval_metric,
+            quantile_levels=quantile_levels,
         )
 
     def load(self) -> None:
@@ -214,7 +225,7 @@ class U2TimeSeriesPredictionModel:
                 return
             logger.info(f"Loading predictor from {self.model_path}")
             self.predictor = TimeSeriesPredictor.load(self.model_path, require_version_match=self.require_version_match)
-            with open(f"{self.model_path}/{DEFAULT_MODEL_METADATA_PATH}") as f:
+            with open(f"{self.model_path}/{MODEL_METADATA_PATH}") as f:
                 self.metadata = json.load(f)
             try:
                 self.predictor.persist()
@@ -277,6 +288,7 @@ class U2TimeSeriesPredictionModel:
         self,
         time_series: U2TimeSeriesPredictionDataset,
         min_lookback: int,
+        num_val_windows: int,
         num_test_windows: int,
         save_leaderboards: bool = False,
         training_kwargs: dict = None,
@@ -295,6 +307,8 @@ class U2TimeSeriesPredictionModel:
             Dataset containing the engineered training DataFrame.
         min_lookback : int
             Minimum lookback used to form the backtest split.
+        num_val_windows : int
+            Number of backtesting windows used for validation.
         num_test_windows : int
             Number of backtesting windows used for evaluation.
         save_leaderboards : bool, optional
@@ -317,18 +331,19 @@ class U2TimeSeriesPredictionModel:
                 f"Input data has frequency of {time_series.freq} while the model is set with a frequency of {self.predictor.freq}.\n"
                 "The data will be resampled to match, make sure it is intended"
             )
-        # Location column name is often hanging around from reading the CSV because it is needed for stuff like weather
-        # and holidays, but we don't need it so get rid of it
-        df = df.drop(columns=[DEFAULT_TIME_SERIES_LOCATION_COLUMN_NAME, "latitude", "longitude"], errors="ignore")
-        df = TimeSeriesDataFrame(df)
+        df = TimeSeriesDataFrame(df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
 
         train_data, test_data = df.train_test_split(
             prediction_length=min_lookback + self.predictor.prediction_length * num_test_windows
         )
         training_start = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        self.predictor.fit(train_data, **training_kwargs)
+        self.predictor.fit(
+            train_data=train_data, num_val_windows=num_val_windows, refit_every_n_windows=None, **training_kwargs
+        )
 
-        self._save_metadata(time_series, min_lookback, num_test_windows, training_start, training_kwargs)
+        self._save_metadata(
+            time_series, min_lookback, num_val_windows, num_test_windows, training_start, training_kwargs
+        )
         if save_leaderboards:
             self._save_leaderboards(num_test_windows, test_data)
 
@@ -366,4 +381,11 @@ class U2TimeSeriesPredictionModel:
             if self.predictor is None:
                 raise RuntimeError("Predictor not loaded")
 
-            return self.predictor.predict(time_series.df, time_series.future_df, **kwargs)
+            df = TimeSeriesDataFrame(time_series.df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+            future_df = (
+                TimeSeriesDataFrame(time_series.future_df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+                if time_series.future_df is not None
+                else None
+            )
+
+            return self.predictor.predict(data=df, known_covariates=future_df, **kwargs)

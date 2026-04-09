@@ -9,7 +9,7 @@ held responsible for them. U2Demo has received funding from the European Union's
 agreement no. 101160684.
 
 This is the output of the forecasting algorithms developed in task 4.2. It is the source code for the time series
-prediction algorithm used in the U2 Demo project. It is used to train models for the prediction of time series and
+prediction algorithm used in the U2Demo project. It is used to train models for the prediction of time series and
 perform inference on them.
 
 Models trained with this application will contain custom metadata that is relevant to the specific nature of the U2
