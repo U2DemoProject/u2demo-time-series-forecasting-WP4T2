@@ -191,7 +191,8 @@ def enrich_weather(
         weather_df = weather_df.drop(columns=["time"])
         return pd.merge(df_chunk, weather_df, on="time_aligned", how="left")
 
-    if present_time is None:
+    # Past weather forecasts from Open Meteo are only available starting from 2022
+    if present_time is None or present_time < dt.datetime(2022, 1, 1, tzinfo=dt.UTC):
         final_df = _process_subset(df, "historical", latlon[0], latlon[1])
     else:
         df_past = df[df[time_col] <= present_time]

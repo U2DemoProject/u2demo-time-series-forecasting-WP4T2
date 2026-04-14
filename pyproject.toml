@@ -37,6 +37,10 @@ dev = [
     "pre-commit (>=4.5.1,<5.0.0)",
     "gitlint (>=0.19.1,<0.20.0)"
 ]
+examples = [
+    "ucimlrepo (>=0.0.7,<0.0.8)",
+    "ipykernel (>=7.2.0,<8.0.0)"
+]
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"

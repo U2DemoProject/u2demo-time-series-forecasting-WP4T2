@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
-from autogluon.timeseries.metrics import WAPE
 
 from u2 import __version__
 from u2.dataset import U2TimeSeriesPredictionDataset
@@ -76,7 +75,7 @@ class U2TimeSeriesPredictionModel:
         cutoffs = range(-num_test_windows * horizon, -horizon + 1, horizon)
         leaderboards = []
         for cutoff in cutoffs:
-            lb = self.predictor.leaderboard(test_data, cutoff=cutoff, extra_metrics=[WAPE], silent=True)
+            lb = self.predictor.leaderboard(test_data, cutoff=cutoff, extra_metrics=["WAPE"], silent=True)
             lb["cutoff"] = cutoff
             leaderboards.append(lb)
 

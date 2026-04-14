@@ -7,5 +7,6 @@ venv/
 .tool-versions
 *.Identifier
 models/*
+examples/models/*
 data/*
 output/
