@@ -64,6 +64,8 @@ def train(
             lags,
             lags,  #  Windows does not necessarily need to be the same as lags but up to now it was not found to be necessary for a different value
         )
+        if not lags:  # num_weekly_lags=0 produces empty list; normalize for downstream min_timeseries_length
+            lags = [0]
     else:
         lags = [0]
     if "holiday" in features:
@@ -71,7 +73,8 @@ def train(
     if "weather" in features:
         time_series.add_weather()
 
-    horizon = data.time_parameters.horizon_hours * 60 // time_series.freq_minutes
+    # Ensure at least 1 step when horizon < freq (e.g. 12h horizon with daily data)
+    horizon = max(1, data.time_parameters.horizon_hours * 60 // time_series.freq_minutes)
     min_lookback = data.training_model_config.lookback_steps or DEFAULT_TRAIN_MIN_LOOKBACK
 
     known_covariate_names = (

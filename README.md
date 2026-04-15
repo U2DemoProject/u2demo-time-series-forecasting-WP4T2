@@ -2,6 +2,9 @@
 
 # U2 Time Series Prediction
 
+[![coverage](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/badges/main/coverage.svg)](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/-/commits/main)
+[![pipeline](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/badges/main/pipeline.svg)](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/-/pipelines)
+
 This document has been produced in the context of the U2Demo project. Views and opinions expressed in this document are
 however those of the authors only and do not necessarily reflect those of the European Union or the European Climate,
 Infrastructure and Environment Executive Agency (CINEA). Neither the European Union nor the granting authority can be
@@ -317,14 +320,42 @@ To install `pytest`, use the command:
 poetry install --with dev
 ```
 
-Run all tests with:
+### Test markers
+
+Tests are organized into three categories using pytest markers:
+
+| Marker | What it covers | Requirements |
+|--------|---------------|--------------|
+| `unit` | Fast, isolated tests with mocked externals | None |
+| `integration` | Real AutoGluon models, real API calls | Network access, external APIs available |
+| `e2e` | Full train-then-predict pipeline with Chronos2 | Chronos2 model download (~500MB first run) |
+
+### Running tests
+
+By default, `poetry run pytest` runs only **unit tests** (e2e and integration are excluded via `pytest.ini`). This is also what CI runs.
 
 ```sh
+# Unit tests only (default, CI-safe)
 poetry run pytest
+
+# End-to-end tests (trains real Chronos2 models)
+poetry run pytest -m e2e
+
+# Integration tests (real AutoGluon models + external API calls)
+poetry run pytest -m integration
+
+# Everything
+poetry run pytest -m "unit or integration or e2e"
 ```
 
 Run a specific test file with:
 
 ```sh
 poetry run pytest tests/test_dataset.py
+```
+
+To get a coverage summary (e.g. to paste into a MR description):
+
+```sh
+poetry run coverage report --format=markdown
 ```

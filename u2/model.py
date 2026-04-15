@@ -153,7 +153,10 @@ class U2TimeSeriesPredictionModel:
             metadata["windows"] = windows
         else:
             lags = [0]
-        metadata["min_timeseries_length"] = get_min_timeseries_length(lags=lags, min_lookback=min_lookback)
+        # Include horizon so metadata threshold matches the one used during training validation
+        metadata["min_timeseries_length"] = get_min_timeseries_length(
+            lags=lags, min_lookback=min_lookback, horizon=self.predictor.prediction_length
+        )
 
         with open(f"{self.model_path}/{MODEL_METADATA_PATH}", "w") as f:
             json.dump(metadata, f, indent=4)

@@ -147,4 +147,5 @@ def get_min_timeseries_length(lags: list[int], min_lookback: int, horizon: int |
         The minimum time-series length expected.
 
     """
-    return max(lags) + min_lookback + (horizon or 0)
+    # Guard against empty lags list: max([]) raises ValueError
+    return (max(lags) if lags else 0) + min_lookback + (horizon or 0)

@@ -10,6 +10,11 @@ import pandas as pd
 import pytest
 
 from u2.data_models import ForecastTrainingInput
+from u2.defaults import (
+    TIME_SERIES_GROUP_COLUMN_NAME,
+    TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
+    TIME_SERIES_TIMESTAMP_COLUMN_NAME,
+)
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +166,36 @@ def json_long_periods(temp_dir: str) -> str:
     path = os.path.join(temp_dir, "long_periods.json")
     _write_json(payload, path)
     return path
+
+
+@pytest.fixture
+def multi_group_df() -> pd.DataFrame:
+    """
+    DataFrame with two groups of different lengths for testing cross-group isolation.
+
+    Group 'group_a' has 200 hourly rows; 'group_b' has 150 hourly rows.
+    Both start at the same date so their timestamps overlap, making any
+    cross-group bleed immediately detectable.
+    """
+    rng = np.random.default_rng(42)
+    dates_a = pd.date_range(start="2023-01-01", periods=200, freq="h")
+    dates_b = pd.date_range(start="2023-01-01", periods=150, freq="h")
+
+    df_a = pd.DataFrame(
+        {
+            TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates_a,
+            TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: rng.random(200),
+            TIME_SERIES_GROUP_COLUMN_NAME: "group_a",
+        }
+    )
+    df_b = pd.DataFrame(
+        {
+            TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates_b,
+            TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: rng.random(150) + 100.0,  # offset so group_b values are distinct
+            TIME_SERIES_GROUP_COLUMN_NAME: "group_b",
+        }
+    )
+    return pd.concat([df_a, df_b], ignore_index=True)
 
 
 @pytest.fixture

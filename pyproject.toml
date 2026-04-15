@@ -35,7 +35,8 @@ dev = [
     "ruff (>=0.14.8,<0.15.0)",
     "pytest (>=9.0.2,<10.0.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
-    "gitlint (>=0.19.1,<0.20.0)"
+    "gitlint (>=0.19.1,<0.20.0)",
+    "pytest-cov (>=7.1.0,<8.0.0)"
 ]
 examples = [
     "ucimlrepo (>=0.0.7,<0.0.8)",
@@ -44,3 +45,19 @@ examples = [
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
+
+[tool.coverage.run]
+source = ["u2"]
+omit = ["u2/logging_config.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"

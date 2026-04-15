@@ -61,7 +61,7 @@ extend-safe-fixes = ["C", "D", "A", "W291"]
 
 [lint.extend-per-file-ignores]
 "**/__init__.py" = ["D"]
-"tests/test_*.py" = ["D", "ANN201"]
+"tests/test_*.py" = ["D", "ANN001", "ANN201", "ANN202", "ARG001", "ARG002", "ARG005"]
 
 [format]
 quote-style = "double"

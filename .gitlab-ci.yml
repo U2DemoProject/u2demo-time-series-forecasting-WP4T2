@@ -119,7 +119,7 @@ poetry_lock:
     - poetry check --lock
 
 
-# Run tests 
+# Run tests with coverage
 test:
   extends: .python_base
   stage: test
@@ -129,3 +129,13 @@ test:
   script:
     - poetry run pytest
     - echo "✓ All tests passed"
+  artifacts:
+    when: always
+    paths:
+      - htmlcov/
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'

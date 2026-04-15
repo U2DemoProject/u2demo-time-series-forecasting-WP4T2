@@ -65,7 +65,7 @@ def predict(data: ForecastInput) -> Forecast:
         )
         raise AssertionError(error)
 
-    horizon_steps = data.time_parameters.horizon_hours * 60 // time_series.freq_minutes
+    horizon_steps = max(1, data.time_parameters.horizon_hours * 60 // time_series.freq_minutes)
     if horizon_steps != model.predictor.prediction_length:
         raise AssertionError(
             f"Requested forecast horizon ({horizon_steps} steps) does not match model's prediction length ({model.predictor.prediction_length} steps)."

@@ -88,6 +88,13 @@ class U2TimeSeriesPredictionDataset:
             data=[value.model_dump() for value in data.target_series.training_values], orient="columns"
         )
         if data.exogenous_series:
+            # Reject duplicate variable names early to prevent silent column duplication
+            variable_names = [exog_series.variable_name for exog_series in data.exogenous_series]
+            duplicates = [name for name in set(variable_names) if variable_names.count(name) > 1]
+            if duplicates:
+                error = f"Duplicate exogenous variable names detected: {duplicates}. Each exogenous series must have a unique variable_name."
+                raise ValueError(error)
+
             exogenous_df = pd.concat(
                 [
                     pd.DataFrame.from_dict(
@@ -116,7 +123,11 @@ class U2TimeSeriesPredictionDataset:
 
         obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME] = obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].dt.tz_localize(None)
 
+        # infer_freq returns None for irregular timestamps; catch early with a clear message
         freq = pd.infer_freq(obj.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME])
+        if freq is None:
+            error = "Could not infer a consistent frequency from the timestamps. Check for irregular spacing in the input data."
+            raise ValueError(error)
         freq_minutes = int(pd.Timedelta(pd.tseries.frequencies.to_offset(freq=freq)).total_seconds() / 60)
 
         if data.time_parameters.timestep_minutes is not None and data.time_parameters.timestep_minutes != freq_minutes:
@@ -177,7 +188,8 @@ class U2TimeSeriesPredictionDataset:
             error = "The input data contains NaN values."
             raise ValueError(error)
 
-        obj.extend_by_horizon(data.time_parameters.horizon_hours * 60 // freq_minutes)
+        # Ensure at least 1 step when horizon < freq (e.g. 12h horizon with daily data)
+        obj.extend_by_horizon(max(1, data.time_parameters.horizon_hours * 60 // freq_minutes))
 
         if data.exogenous_series:
             exogenous_df = pd.concat(
@@ -313,7 +325,12 @@ class U2TimeSeriesPredictionDataset:
         for _item_id, subdf in self.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME, group_keys=False):
             # Split this group's data
             future_part = subdf.tail(horizon)
-            remaining_part = subdf.iloc[:-horizon] if len(subdf) > horizon else subdf.iloc[0:0]
+            if horizon == 0:  # In Python -0 == 0, so iloc[:-0] silently becomes iloc[:0] (empty)
+                remaining_part = subdf
+            elif len(subdf) > horizon:
+                remaining_part = subdf.iloc[:-horizon]
+            else:
+                remaining_part = subdf.iloc[0:0]
 
             future_frames.append(future_part)
             remaining_frames.append(remaining_part)
@@ -335,6 +352,9 @@ class U2TimeSeriesPredictionDataset:
             Updates `self.df` and records added column names.
 
         """
+        # Drop previously-added temporal columns so calling add_temporal() twice is idempotent
+        if "temporal" in self.added_columns:
+            self.df = self.df.drop(columns=self.added_columns["temporal"], errors="ignore")
         self.df, self.added_columns["temporal"] = add_encoded_time_features(self.df)
 
     def add_lags(self, lags: list[int], windows: list[int]) -> None:

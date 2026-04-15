@@ -10,3 +10,7 @@ models/*
 examples/models/*
 data/*
 output/
+coverage.xml
+report.xml
+.coverage
+htmlcov/

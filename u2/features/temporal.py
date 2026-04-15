@@ -141,7 +141,8 @@ def add_day_of_week_onehot(df: pd.DataFrame, datetime_col: str = "timestamp") ->
 
     """
     df = df.copy()
-    df["day_of_week"] = df[datetime_col].dt.dayofweek
+    # Use Categorical with all 7 days so get_dummies always produces day_of_week_0..6
+    df["day_of_week"] = pd.Categorical(df[datetime_col].dt.dayofweek, categories=range(7))
     return pd.get_dummies(df, columns=["day_of_week"], prefix="day_of_week")
 
 

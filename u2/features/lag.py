@@ -104,7 +104,7 @@ class LagFeatureGenerator:
         """
         implemented_statistics = ["mean", "std", "min", "max"]
 
-        if not statistics:
+        if statistics is None:  # Only default when None; empty list [] means "no stats"
             statistics = implemented_statistics
 
         unsupported_statistics = set(statistics).difference(implemented_statistics)
@@ -117,7 +117,7 @@ class LagFeatureGenerator:
                 grouped = self.df.groupby(self.group_name)[column]
                 roll = grouped.shift(1).rolling(window=w)
                 for stat in statistics:
-                    if hasattr(roll, stat):
+                    if hasattr(roll, stat):  # pragma: no cover – validated above
                         col_name = f"roll_{stat}_{w}"
                         self.df[col_name] = getattr(roll, stat)()
                         self.added_columns.append(col_name)

@@ -108,7 +108,7 @@ def enrich_weather(
     latlon: tuple[float, float],
     present_time: dt.datetime | None,
     frequency: str,
-    variables: list[str] = None,
+    variables: list[str] | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
     Enrich a time-series DataFrame with weather variables aligned per timestamp.
@@ -153,6 +153,12 @@ def enrich_weather(
     df = df.copy()
     df[time_col] = pd.to_datetime(df[time_col], errors="raise")
 
+    # Normalize present_time to a naive UTC datetime so it is directly comparable to both
+    # the naive df timestamps and the naive 2022 cutoff below.  Callers may pass a naive
+    # datetime (assumed UTC) or a timezone-aware one; strip the tzinfo after converting.
+    if present_time is not None and present_time.tzinfo is not None:
+        present_time = present_time.astimezone(dt.UTC).replace(tzinfo=None)
+
     if not variables:
         variables = DEFAULT_WEATHER_DAILY_VARS if frequency.endswith("D") else DEFAULT_WEATHER_HOURLY_VARS
 
@@ -191,8 +197,9 @@ def enrich_weather(
         weather_df = weather_df.drop(columns=["time"])
         return pd.merge(df_chunk, weather_df, on="time_aligned", how="left")
 
-    # Past weather forecasts from Open Meteo are only available starting from 2022
-    if present_time is None or present_time < dt.datetime(2022, 1, 1, tzinfo=dt.UTC):
+    # Past weather forecasts from Open Meteo are only available starting from 2022 (UTC).
+    # present_time has already been normalized to naive UTC above.
+    if present_time is None or present_time < dt.datetime(2022, 1, 1):
         final_df = _process_subset(df, "historical", latlon[0], latlon[1])
     else:
         df_past = df[df[time_col] <= present_time]

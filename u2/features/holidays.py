@@ -133,6 +133,8 @@ def merge_holidays_with_dataframe(
     encoded_holidays, holiday_columns = encode_holiday_types(filtered_holidays)
     encoded_holidays[date_column] = pd.to_datetime(encoded_holidays[date_column]).dt.date
     encoded_holidays = encoded_holidays[[date_column] + holiday_columns]
+    # Collapse multiple holidays on the same date to avoid row duplication during merge
+    encoded_holidays = encoded_holidays.groupby(date_column, as_index=False)[holiday_columns].max()
 
     merged_df = df.merge(encoded_holidays, left_on=date_column, right_on=date_column, how="left")
 
