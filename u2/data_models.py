@@ -3,6 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, StringConstraints
 
+from u2.features.names import FeatureName
+
 type QuantileKey = Annotated[str, StringConstraints(pattern=r"^(0(\.\d+)?|1(\.0+)?)$")]
 type QuantileLevel = Annotated[float, Field(ge=0, le=1)]
 
@@ -60,6 +62,9 @@ class ModelConfig(BaseModel):
     )
     quantile_levels: list[QuantileLevel] | None = Field(
         default=None, description="Quantile levels to predict (for quantile regression models)."
+    )
+    excluded_model_types: list[str] | None = Field(
+        default=None, description="Model types to exclude from training (e.g., ['DeepAR', 'PatchTST'])."
     )
 
 
@@ -155,6 +160,15 @@ class ForecastTrainingInput(BaseModel):
     location: Location | None = Field(default=None, description="Geographic location of the asset.")
     exogenous_series: list[TrainingExogenousSeries] | None = Field(
         default=None, description="Optional additional time series of external variables."
+    )
+    features: list[FeatureName] = Field(
+        default_factory=list,
+        description="Feature-engineering steps to apply during training.",
+    )
+    num_weekly_lags: int = Field(
+        default=0,
+        ge=0,
+        description="Number of weekly lag/rolling-stat features to generate when the lag feature is enabled.",
     )
 
 

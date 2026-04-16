@@ -1,10 +1,13 @@
+import numpy as np
 import pandas as pd
 import requests
 from joblib import Memory
 from sklearn.preprocessing import MultiLabelBinarizer
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.defaults import CACHE_DIR, DEFAULT_HOLIDAY_TYPES, PUBLIC_HOLIDAY_API_URL
+from u2.constants.envs import settings
+from u2.constants.holidays import DEFAULT_HOLIDAY_TYPES
+from u2.constants.paths import CACHE_DIR
 from u2.utils import is_retryable_error, reverse_geocode
 
 memory = Memory(location=CACHE_DIR, verbose=0)
@@ -45,8 +48,8 @@ def fetch_holidays_by_year(country_code: str, year: str) -> pd.DataFrame:
         If the HTTP request fails after retries.
 
     """
-    api_url = f"{PUBLIC_HOLIDAY_API_URL}/publicholidays/{year}/{country_code}"
-    response = requests.get(api_url)
+    api_url = f"{settings.public_holiday_api_url}/publicholidays/{year}/{country_code}"
+    response = requests.get(api_url, timeout=30)
     response.raise_for_status()
     return pd.DataFrame(response.json())
 
@@ -77,14 +80,16 @@ def encode_holiday_types(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
 
     encoder = MultiLabelBinarizer(classes=holiday_types)
     encoded = encoder.fit_transform(df["types"])
+    # MultiLabelBinarizer returns ndarray at runtime; stubs type it as ndarray | csr_matrix.
+    encoded_array = encoded if isinstance(encoded, np.ndarray) else encoded.toarray()
 
-    encoded_df = pd.DataFrame(encoded, columns=column_names, index=df.index)
+    encoded_df = pd.DataFrame(encoded_array, columns=pd.Index(column_names), index=df.index)
     return pd.concat([df, encoded_df], axis=1), column_names
 
 
 def merge_holidays_with_dataframe(
     df: pd.DataFrame, latlon: tuple[float, float], datetime_column: str = "timestamp"
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[str]]:
     """
     Add holiday indicator features to a DataFrame based on dates and a geocoded place.
 
@@ -126,13 +131,12 @@ def merge_holidays_with_dataframe(
 
     holidays = pd.concat([fetch_holidays_by_year(country_code, str(year)) for year in df[year_column].unique()])
 
-    filtered_holidays = holidays[
-        holidays["counties"].apply(lambda counties: region_code in counties if counties else True)
-    ]
+    mask = holidays["counties"].apply(lambda counties: region_code in counties if counties else True)
+    filtered_holidays = holidays[mask]
 
     encoded_holidays, holiday_columns = encode_holiday_types(filtered_holidays)
     encoded_holidays[date_column] = pd.to_datetime(encoded_holidays[date_column]).dt.date
-    encoded_holidays = encoded_holidays[[date_column] + holiday_columns]
+    encoded_holidays = encoded_holidays[[date_column, *holiday_columns]]
     # Collapse multiple holidays on the same date to avoid row duplication during merge
     encoded_holidays = encoded_holidays.groupby(date_column, as_index=False)[holiday_columns].max()
 

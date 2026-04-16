@@ -1,15 +1,20 @@
 repos:
     -   repo: https://github.com/astral-sh/ruff-pre-commit
       # Ruff version.
-        rev: v0.14.8
+        rev: v0.15.9
         hooks:
         # Run the linter.
         -   id: ruff-check
             args: [--fix]
         # Run the formatter.
         -   id: ruff-format
+    -   repo: https://github.com/RobertCraigie/pyright-python
+        rev: v1.1.408
+        hooks:
+        -   id: pyright
+            additional_dependencies: ['nodejs-wheel-binaries']
     -   repo: https://github.com/python-poetry/poetry
-        rev: 2.2.1
+        rev: 2.3.2
         hooks:
         -   id: poetry-check
             stages: [pre-commit]
@@ -17,7 +22,7 @@ repos:
         -   id: poetry-lock
             stages: [pre-commit]
     -   repo: https://github.com/python-poetry/poetry-plugin-export
-        rev: 1.9.0
+        rev: 1.10.0
         hooks:
         -   id: poetry-export
             stages: [pre-commit]

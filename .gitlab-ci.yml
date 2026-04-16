@@ -1,9 +1,15 @@
+# Internal GitLab CI pipeline.
+#
+# This project is developed on an internal GitLab instance and mirrored to
+# GitHub for public releases. This file drives the internal pipeline only;
+# the public GitHub Actions pipeline lives at .github/workflows/ci.yml.
+# Both configurations are intentionally kept in sync.
+
 stages:
   - lint
   - test
 
 variables:
-  POETRY_VERSION: "2.2.1"
   POETRY_NO_INTERACTION: "1"
   POETRY_VIRTUALENVS_IN_PROJECT: "true"
 
@@ -14,11 +20,12 @@ variables:
     key:
       files:
         - poetry.lock
-      prefix: "v$POETRY_VERSION"
+      prefix: "poetry"
     paths:
       - .poetry-home
       - .venv
   before_script:
+    - POETRY_VERSION=$(grep -A1 "python-poetry/poetry$" .pre-commit-config.yaml | grep "rev:" | awk '{print $2}')
     - |
       if [ ! -f .poetry-home/bin/poetry ]; then
         python -m venv .poetry-home
@@ -109,17 +116,15 @@ poetry_lock:
     - kvm_runner_1
   only:
     - merge_request
-  cache:
-    key: "poetry-$POETRY_VERSION"
-    paths:
-      - .cache/pip
+  cache: []
   before_script:
+    - POETRY_VERSION=$(grep -A1 "python-poetry/poetry$" .pre-commit-config.yaml | grep "rev:" | awk '{print $2}')
     - pip install poetry==$POETRY_VERSION
   script:
     - poetry check --lock
 
 
-# Run tests with coverage
+# Run unit tests on MRs (fast); full suite on main
 test:
   extends: .python_base
   stage: test
@@ -127,7 +132,12 @@ test:
     - main
     - merge_request
   script:
-    - poetry run pytest
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        poetry run pytest -m "not e2e and not integration"
+      else
+        poetry run pytest --cov-fail-under=100
+      fi
     - echo "✓ All tests passed"
   artifacts:
     when: always

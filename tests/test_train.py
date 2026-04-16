@@ -93,12 +93,23 @@ class TestTrainOrchestration:
 
         mock_model.train.assert_called_once()
 
-    @patch("u2.train.U2TimeSeriesPredictionModel")
-    def test_unrecognized_feature_raises(self, mock_model_cls):
-        """Unrecognized features should raise ValueError."""
-        data = _make_training_input(periods=200, features=["nonexistent_feature"])
+    def test_unrecognized_feature_raises(self):
+        """Unrecognized features should be rejected at model validation time."""
+        with pytest.raises(ValueError, match="nonexistent_feature"):
+            _make_training_input(periods=200, features=["nonexistent_feature"])
 
-        with pytest.raises(ValueError, match="Unrecognized time series feature"):
+    @patch("u2.train.U2TimeSeriesPredictionDataset")
+    @patch("u2.train.U2TimeSeriesPredictionModel")
+    def test_raises_when_freq_minutes_not_initialized(self, mock_model_cls, mock_dataset_cls):
+        """train should raise when dataset exposes freq_minutes=None / freq=None."""
+        mock_dataset = MagicMock()
+        mock_dataset.freq = None
+        mock_dataset.freq_minutes = None
+        mock_dataset_cls.from_training_input.return_value = mock_dataset
+
+        data = _make_training_input(periods=200, features=[], lookback_steps=50)
+
+        with pytest.raises(RuntimeError, match="Frequency is not initialized"):
             train(data)
 
     @patch("u2.train.U2TimeSeriesPredictionModel")

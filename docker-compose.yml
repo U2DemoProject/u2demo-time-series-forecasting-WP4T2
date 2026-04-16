@@ -1,5 +1,5 @@
 services:
-  u2-time-series-prediction:
+  u2demo-time-series-prediction:
     image: ${U2_TIME_SERIES_PREDICTION_IMAGE:-u2/time-series-prediction:latest}
     deploy:
       resources:

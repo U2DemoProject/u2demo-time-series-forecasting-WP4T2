@@ -1,14 +1,15 @@
 import os
 from datetime import UTC, datetime
 
-from u2.data_models import Forecast, ForecastInput, ForecastSeries
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import (
-    MODEL_PATH,
+from u2.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
+from u2.constants.paths import MODEL_DIR
+from u2.data_models import Forecast, ForecastedTimeValue, ForecastInput, ForecastSeries
+from u2.dataset import U2TimeSeriesPredictionDataset
+from u2.features.pipeline import apply_features
 from u2.model import U2TimeSeriesPredictionModel
 
 
@@ -36,53 +37,52 @@ def predict(data: ForecastInput) -> Forecast:
 
     Raises
     ------
-    AssertionError
-        If the model frequency does not match the time-series frequency.
     ValueError
-        If feature engineering or enrichment steps encounter invalid inputs.
-
+        If the model frequency does not match the time-series frequency, if the
+        requested forecast horizon does not match the model's prediction length,
+        or if feature engineering or enrichment steps encounter invalid inputs.
 
     """
     # Load the model early because we will use some of its properties to enrich the input data
     model_path = os.path.join(
-        MODEL_PATH,
+        MODEL_DIR,
         f"{data.model_id}_{data.model_version}",
     )
 
     model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
     model.load()
+    if model.metadata is None:
+        raise RuntimeError("Model metadata is not loaded")
 
-    features = model.metadata.get("added_columns", [])
+    features = list(model.metadata.added_columns.keys())
 
     time_series = U2TimeSeriesPredictionDataset.from_forecast_input(data)
 
-    time_series.drop_short_timeseries(model.metadata["min_timeseries_length"])
+    time_series.drop_short_timeseries(model.metadata.min_timeseries_length)
 
     # Model is trained on a specific frequency so it must be verified
-    if model.predictor.freq != time_series.freq:
-        error = (
-            f"Model frequency (`{model.predictor.freq}`) does not match time series frequency (`{time_series.freq}`)"
-        )
-        raise AssertionError(error)
+    if model.freq != time_series.freq:
+        error = f"Model frequency (`{model.freq}`) does not match time series frequency (`{time_series.freq}`)"
+        raise ValueError(error)
 
+    if time_series.freq_minutes is None:
+        raise RuntimeError("Frequency minutes is not initialized")
     horizon_steps = max(1, data.time_parameters.horizon_hours * 60 // time_series.freq_minutes)
-    if horizon_steps != model.predictor.prediction_length:
-        raise AssertionError(
-            f"Requested forecast horizon ({horizon_steps} steps) does not match model's prediction length ({model.predictor.prediction_length} steps)."
+    if horizon_steps != model.prediction_length:
+        raise ValueError(
+            f"Requested forecast horizon ({horizon_steps} steps) does not match model's prediction length ({model.prediction_length} steps)."
         )
 
-    if "temporal" in features:
-        time_series.add_temporal()
-    if "lag" in features:
-        time_series.add_lags(model.metadata["lags"], model.metadata["windows"])
-    if "holiday" in features:
-        time_series.add_holidays()
-    if "weather" in features:
-        time_series.add_weather()
+    apply_features(
+        time_series,
+        features,
+        lags=model.metadata.lags,
+        windows=model.metadata.windows,
+    )
 
     time_series.split_past_and_future_dfs(horizon_steps)
 
-    quantile_levels = model.predictor.quantile_levels
+    quantile_levels = model.quantile_levels
 
     prediction_df = model.predict(time_series)
     prediction_df = (
@@ -96,17 +96,17 @@ def predict(data: ForecastInput) -> Forecast:
 
     records = prediction_df.to_dict("records")
     prediction = [
-        {
-            TIME_SERIES_TIMESTAMP_COLUMN_NAME: r[TIME_SERIES_TIMESTAMP_COLUMN_NAME],
-            TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: r[TIME_SERIES_PREDICT_VALUE_COLUMN_NAME],
-            "quantiles": {str(q): r[str(q)] for q in quantile_levels},
-        }
+        ForecastedTimeValue(
+            time=r[TIME_SERIES_TIMESTAMP_COLUMN_NAME],
+            value=r[TIME_SERIES_PREDICT_VALUE_COLUMN_NAME],
+            quantiles={str(q): r[str(q)] for q in quantile_levels},
+        )
         for r in records
     ]
 
     return Forecast(
         forecast_type=data.forecast_type,
-        forecast_date=datetime.now(UTC).isoformat(),
+        forecast_date=datetime.now(UTC),
         time_parameters=data.time_parameters,
         forecast_series=ForecastSeries(
             series_id=data.target_series.series_id,

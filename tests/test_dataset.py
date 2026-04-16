@@ -13,13 +13,13 @@ import pytest
 from pydantic import ValidationError
 
 from tests.conftest import load_training_input_from_json
-from u2.data_models import ForecastInput, ForecastTrainingInput
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import (
+from u2.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
+from u2.data_models import ForecastInput, ForecastTrainingInput, TimeValue
+from u2.dataset import U2TimeSeriesPredictionDataset
 
 
 @pytest.mark.unit
@@ -545,18 +545,22 @@ class TestU2TimeSeriesPredictionDataset:
                 "asset_type": "PV",
                 "training_values": [{"time": ts.isoformat(), "value": float(i)} for i, ts in enumerate(dates)],
             },
+            "exogenous_series": [
+                {
+                    "series_id": "exog1",
+                    "variable_name": "temperature",
+                    "training_values": [{"time": ts.isoformat(), "value": float(i)} for i, ts in enumerate(dates)],
+                }
+            ],
         }
         data = ForecastTrainingInput(**payload)
 
-        def patched_from_dict(*args, **kwargs):
-            return pd.DataFrame()
-
-        monkeypatch.setattr(pd.DataFrame, "from_dict", staticmethod(patched_from_dict))
+        monkeypatch.setattr(pd, "merge", lambda *args, **kwargs: pd.DataFrame())
 
         with pytest.raises(ValueError, match="The input data is empty"):
             U2TimeSeriesPredictionDataset.from_training_input(data)
 
-    def test_from_forecast_input_nan_after_construction(self, monkeypatch):
+    def test_from_forecast_input_nan_after_construction(self):
         """NaN in DataFrame after construction should raise ValueError in from_forecast_input."""
         dates = pd.date_range(start="2023-01-01", periods=200, freq="h")
         data = ForecastInput(
@@ -573,14 +577,7 @@ class TestU2TimeSeriesPredictionDataset:
             },
         )
 
-        original_from_dict = pd.DataFrame.from_dict
-
-        def patched_from_dict(*args, **kwargs):
-            df = original_from_dict(*args, **kwargs)
-            df.loc[5, "value"] = np.nan
-            return df
-
-        monkeypatch.setattr(pd.DataFrame, "from_dict", staticmethod(patched_from_dict))
+        data.target_series.historical_values[5] = TimeValue(time=dates[5], value=float("nan"))
 
         with pytest.raises(ValueError, match="The input data contains NaN values"):
             U2TimeSeriesPredictionDataset.from_forecast_input(data)
@@ -603,14 +600,14 @@ class TestU2TimeSeriesPredictionDataset:
         expectation,
     ):
         """Series at exactly min_timeseries_length is kept; one row below is dropped."""
-        dataset = U2TimeSeriesPredictionDataset()
-        dataset.df = pd.DataFrame(
+        df = pd.DataFrame(
             {
                 TIME_SERIES_TIMESTAMP_COLUMN_NAME: pd.date_range(start="2023-01-01", periods=n_rows, freq="h"),
                 TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.arange(n_rows, dtype=float),
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
+        dataset = U2TimeSeriesPredictionDataset.from_dataframe(df)
 
         with expectation:
             dataset.drop_short_timeseries(threshold)
@@ -1031,17 +1028,14 @@ class TestSplitPastAndFutureDfs:
 
     def _make_dataset(self, periods=200, freq="h"):
         """Build a simple dataset for split testing."""
-        ds = U2TimeSeriesPredictionDataset()
-        ds.df = pd.DataFrame(
+        df = pd.DataFrame(
             {
                 TIME_SERIES_TIMESTAMP_COLUMN_NAME: pd.date_range(start="2023-01-01", periods=periods, freq=freq),
                 TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: np.arange(periods, dtype=float),
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        ds.freq = freq
-        ds.freq_timedelta = pd.Timedelta(hours=1) if freq == "h" else pd.Timedelta(days=1)
-        return ds
+        return U2TimeSeriesPredictionDataset.from_dataframe(df)
 
     def test_horizon_of_one(self):
         """Splitting with horizon=1 should extract exactly one row per group."""
@@ -1078,7 +1072,6 @@ class TestSplitPastAndFutureDfs:
 
     def test_multi_group_independence(self):
         """Each group should be split independently."""
-        ds = U2TimeSeriesPredictionDataset()
         frames = []
         for i, size in enumerate([100, 80]):
             dates = pd.date_range(start="2023-01-01", periods=size, freq="h")
@@ -1091,9 +1084,7 @@ class TestSplitPastAndFutureDfs:
                     }
                 )
             )
-        ds.df = pd.concat(frames, ignore_index=True)
-        ds.freq = "h"
-        ds.freq_timedelta = pd.Timedelta(hours=1)
+        ds = U2TimeSeriesPredictionDataset.from_dataframe(pd.concat(frames, ignore_index=True))
 
         ds.split_past_and_future_dfs(10)
 
@@ -1172,16 +1163,22 @@ class TestTimeGapsDataset:
         rng = np.random.default_rng(42)
         values = rng.random(len(dates_with_gap))
 
-        ds = U2TimeSeriesPredictionDataset()
-        ds.df = pd.DataFrame(
+        df = pd.DataFrame(
             {
                 TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates_with_gap,
                 TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: values,
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        ds.freq = "h"
-        ds.freq_timedelta = pd.Timedelta(hours=1)
+        # The gap deliberately breaks pd.infer_freq, so build the dataset by
+        # passing freq metadata explicitly to test that extend_by_horizon uses
+        # the stored freq_timedelta rather than the spacing of the last rows.
+        ds = U2TimeSeriesPredictionDataset(
+            df=df,
+            freq="h",
+            freq_minutes=60,
+            freq_timedelta=pd.Timedelta(hours=1),
+        )
 
         last_ts_before = ds.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].iloc[-1]
         ds.extend_by_horizon(3)
@@ -1260,17 +1257,14 @@ class TestDatasetEdgeCases:
         A zero horizon should be a no-op on the data, not discard it.
         """
         dates = pd.date_range(start="2023-01-01", periods=100, freq="h")
-        ds = U2TimeSeriesPredictionDataset()
-        ds.df = pd.DataFrame(
+        df = pd.DataFrame(
             {
                 TIME_SERIES_TIMESTAMP_COLUMN_NAME: dates,
                 TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: range(100),
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        ds.freq = "h"
-        ds.freq_timedelta = pd.Timedelta("1h")
-        ds.freq_minutes = 60
+        ds = U2TimeSeriesPredictionDataset.from_dataframe(df)
 
         ds.split_past_and_future_dfs(0)
 
@@ -1339,13 +1333,7 @@ class TestMultiGroupPrediction:
                 }
             )
             frames.append(df)
-
-        ds = U2TimeSeriesPredictionDataset()
-        ds.df = pd.concat(frames, ignore_index=True)
-        ds.freq = "h"
-        ds.freq_timedelta = pd.Timedelta(hours=1)
-        ds.freq_minutes = 60
-        return ds
+        return U2TimeSeriesPredictionDataset.from_dataframe(pd.concat(frames, ignore_index=True))
 
     def test_extend_by_horizon_adds_rows_per_group(self):
         """Each group should get exactly `horizon` new rows."""
@@ -1383,3 +1371,28 @@ class TestMultiGroupPrediction:
             ts = group_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].sort_values().reset_index(drop=True)
             diffs = ts.diff().dropna()
             assert (diffs == pd.Timedelta(hours=1)).all(), f"Group {group_id} has non-uniform future spacing"
+
+
+@pytest.mark.unit
+class TestMissingLatlonGuards:
+    """Feature methods that depend on ``self.latlon`` should raise eagerly when it is missing."""
+
+    def _make_dataset(self) -> U2TimeSeriesPredictionDataset:
+        df = pd.DataFrame(
+            {
+                TIME_SERIES_TIMESTAMP_COLUMN_NAME: pd.date_range("2023-01-01", periods=3, freq="h"),
+                TIME_SERIES_PREDICT_VALUE_COLUMN_NAME: [1.0, 2.0, 3.0],
+                TIME_SERIES_GROUP_COLUMN_NAME: 0,
+            }
+        )
+        return U2TimeSeriesPredictionDataset.from_dataframe(df)
+
+    def test_add_holidays_without_latlon_raises(self):
+        ds = self._make_dataset()
+        with pytest.raises(AttributeError, match="Location information is required"):
+            ds.add_holidays()
+
+    def test_add_weather_without_latlon_raises(self):
+        ds = self._make_dataset()
+        with pytest.raises(AttributeError, match="Location information is required"):
+            ds.add_weather()

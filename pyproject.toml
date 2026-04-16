@@ -10,9 +10,29 @@ authors = [
 ]
 readme = "README.md"
 license = {text = "Apache-2.0"}
+keywords = [
+    "time-series",
+    "forecasting",
+    "autogluon",
+    "pytorch",
+    "energy",
+    "machine-learning",
+    "u2demo",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "torch (>=2.2,<2.8)",
+    "torch (>=2.2,<3.0)",
     "fire (>=0.7.1,<0.8.0)",
     "numpy (>=1.25.0,<2.3.0)",
     "pandas (>=2.3.3,<3.0.0)",
@@ -23,7 +43,17 @@ dependencies = [
     "lightning (==2.5.1)",
     "autogluon (>=1.5.0,<2.0.0)",
     "pydantic (>=2.12.5,<3.0.0)",
+    "pydantic-settings (>=2.0,<3.0)",
 ]
+
+[project.urls]
+Homepage = "https://u2demo.eu/"
+Repository = "https://github.com/U2DemoProject/u2demo-time-series-prediction"
+Issues = "https://github.com/U2DemoProject/u2demo-time-series-prediction/issues"
+Documentation = "https://github.com/U2DemoProject/u2demo-time-series-prediction#readme"
+
+[project.scripts]
+u2 = "u2.cli:main"
 
 
 [build-system]
@@ -36,19 +66,25 @@ dev = [
     "pytest (>=9.0.2,<10.0.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
     "gitlint (>=0.19.1,<0.20.0)",
-    "pytest-cov (>=7.1.0,<8.0.0)"
+    "pytest-cov (>=7.1.0,<8.0.0)",
+    "pyright (>=1.1.408,<2.0.0)",
+    "pandas-stubs (>=3.0.0.260204,<4.0.0.0)"
 ]
 examples = [
     "ucimlrepo (>=0.0.7,<0.0.8)",
-    "ipykernel (>=7.2.0,<8.0.0)"
+    "ipykernel (>=7.2.0,<8.0.0)",
+    "ipywidgets (>=8.1.8,<9.0.0)"
 ]
+
+[tool.poetry.group.examples]
+optional = true
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
 
 [tool.coverage.run]
 source = ["u2"]
-omit = ["u2/logging_config.py"]
+omit = ["u2/core/logger.py"]
 
 [tool.coverage.report]
 show_missing = true
@@ -61,3 +97,11 @@ exclude_lines = [
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
+[tool.pyright]
+include = ["u2"]
+exclude = ["tests"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"

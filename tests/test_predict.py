@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from u2.data_models import Forecast, ForecastInput, Location
+from u2.metadata import ModelMetadata, TrainingMetadata
 from u2.predict import predict
 
 
@@ -33,18 +34,33 @@ def _make_forecast_input(periods=200, horizon_hours=24, model_id="test-model", m
     )
 
 
+def _make_metadata(freq="h", prediction_length=24, added_columns=None, lags=None, windows=None):
+    """Build a ModelMetadata instance matching a trained model."""
+    return ModelMetadata(
+        version="0.1.0",
+        frequency=freq,
+        horizon=prediction_length,
+        min_timeseries_length=50,
+        added_columns=added_columns or {},
+        lags=lags or [],
+        windows=windows or [],
+        training=TrainingMetadata(
+            start_utc="2023-01-01 00:00:00",
+            end_utc="2023-01-01 00:01:00",
+            min_lookback=50,
+            num_val_windows=1,
+            num_test_windows=1,
+        ),
+    )
+
+
 def _make_mock_model(freq="h", prediction_length=24, metadata=None):
     """Build a mock model that looks like a loaded U2TimeSeriesPredictionModel."""
     mock_model = MagicMock()
-    mock_model.metadata = metadata or {
-        "added_columns": {},
-        "min_timeseries_length": 50,
-        "frequency": freq,
-        "horizon": prediction_length,
-    }
-    mock_model.predictor.freq = freq
-    mock_model.predictor.prediction_length = prediction_length
-    mock_model.predictor.quantile_levels = [0.1, 0.5, 0.9]
+    mock_model.metadata = metadata or _make_metadata(freq=freq, prediction_length=prediction_length)
+    mock_model.freq = freq
+    mock_model.prediction_length = prediction_length
+    mock_model.quantile_levels = [0.1, 0.5, 0.9]
 
     # Build realistic prediction output
     future_dates = pd.date_range("2023-01-09T08:00:00", periods=prediction_length, freq=freq)
@@ -135,32 +151,61 @@ class TestPredictOrchestration:
         mock_model.load.assert_called_once()
 
     @patch("u2.predict.U2TimeSeriesPredictionModel")
+    def test_raises_when_metadata_not_loaded(self, mock_model_cls):
+        """predict should raise if model.load() leaves metadata None."""
+        mock_model = MagicMock()
+        mock_model.metadata = None
+        mock_model_cls.return_value = mock_model
+
+        data = _make_forecast_input()
+
+        with pytest.raises(RuntimeError, match="Model metadata is not loaded"):
+            predict(data)
+
+    @patch("u2.predict.U2TimeSeriesPredictionDataset")
+    @patch("u2.predict.U2TimeSeriesPredictionModel")
+    def test_raises_when_freq_minutes_not_initialized(self, mock_model_cls, mock_dataset_cls):
+        """predict should raise when the dataset exposes freq_minutes=None."""
+        mock_model = _make_mock_model()
+        mock_model_cls.return_value = mock_model
+
+        mock_dataset = MagicMock()
+        mock_dataset.freq = "h"
+        mock_dataset.freq_minutes = None
+        mock_dataset_cls.from_forecast_input.return_value = mock_dataset
+
+        data = _make_forecast_input()
+
+        with pytest.raises(RuntimeError, match="Frequency minutes is not initialized"):
+            predict(data)
+
+    @patch("u2.predict.U2TimeSeriesPredictionModel")
     def test_frequency_mismatch_raises(self, mock_model_cls):
-        """Frequency mismatch between model and data should raise AssertionError."""
+        """Frequency mismatch between model and data should raise ValueError."""
         mock_model = _make_mock_model(freq="D", prediction_length=24)
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
 
-        with pytest.raises(AssertionError, match="frequency"):
+        with pytest.raises(ValueError, match="frequency"):
             predict(data)
 
     @patch("u2.predict.U2TimeSeriesPredictionModel")
     def test_horizon_mismatch_raises(self, mock_model_cls):
-        """Horizon mismatch between request and model should raise AssertionError."""
+        """Horizon mismatch between request and model should raise ValueError."""
         mock_model = _make_mock_model(prediction_length=48)
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(horizon_hours=24)
 
-        with pytest.raises(AssertionError, match="horizon"):
+        with pytest.raises(ValueError, match="horizon"):
             predict(data)
 
     @patch("u2.predict.U2TimeSeriesPredictionModel")
     def test_temporal_features_applied_when_in_metadata(self, mock_model_cls):
         """When temporal is in model metadata, add_temporal should be called."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"temporal": ["month_sin"]}
+        mock_model.metadata.added_columns = {"temporal": ["month_sin"]}
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -183,9 +228,9 @@ class TestPredictOrchestration:
     def test_lag_features_applied_when_in_metadata(self, mock_model_cls):
         """When lag is in model metadata, add_lags should be called."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"lag": ["lag_168", "roll_mean_168"]}
-        mock_model.metadata["lags"] = [168]
-        mock_model.metadata["windows"] = [168]
+        mock_model.metadata.added_columns = {"lag": ["lag_168", "roll_mean_168"]}
+        mock_model.metadata.lags = [168]
+        mock_model.metadata.windows = [168]
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(periods=500)
@@ -197,7 +242,7 @@ class TestPredictOrchestration:
     def test_holiday_features_applied_when_in_metadata(self, mock_model_cls, monkeypatch):
         """When holiday is in model metadata, add_holidays should be called."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"holiday": ["holiday_public"]}
+        mock_model.metadata.added_columns = {"holiday": ["holiday_public"]}
         mock_model_cls.return_value = mock_model
 
         monkeypatch.setattr(
@@ -215,7 +260,7 @@ class TestPredictOrchestration:
     def test_weather_features_applied_when_in_metadata(self, mock_model_cls, monkeypatch):
         """When weather is in model metadata, add_weather should be called."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"weather": ["temperature_2m"]}
+        mock_model.metadata.added_columns = {"weather": ["temperature_2m"]}
         mock_model_cls.return_value = mock_model
 
         monkeypatch.setattr(
@@ -266,7 +311,7 @@ class TestPredictTransformation:
     def test_quantile_dict_keys_are_strings(self, mock_model_cls):
         """Quantile keys should be string representations of quantile levels."""
         mock_model = _make_mock_model()
-        mock_model.predictor.quantile_levels = [0.1, 0.5, 0.9]
+        mock_model.quantile_levels = [0.1, 0.5, 0.9]
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -337,7 +382,7 @@ class TestFeatureReplaySymmetry:
     def test_empty_metadata_skips_all_features(self, mock_model_cls):
         """When metadata has no added_columns, no feature engineering should run."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {}
+        mock_model.metadata.added_columns = {}
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -350,7 +395,7 @@ class TestFeatureReplaySymmetry:
     def test_temporal_only_replay(self, mock_model_cls):
         """When only temporal is in metadata, only temporal features should be applied."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"temporal": ["month_sin", "month_cos"]}
+        mock_model.metadata.added_columns = {"temporal": ["month_sin", "month_cos"]}
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -362,9 +407,9 @@ class TestFeatureReplaySymmetry:
     def test_lag_replay_uses_metadata_lags_and_windows(self, mock_model_cls):
         """Lag feature replay should use lags and windows from metadata, not recalculate."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {"lag": ["lag_24", "roll_mean_24"]}
-        mock_model.metadata["lags"] = [24]
-        mock_model.metadata["windows"] = [24]
+        mock_model.metadata.added_columns = {"lag": ["lag_24", "roll_mean_24"]}
+        mock_model.metadata.lags = [24]
+        mock_model.metadata.windows = [24]
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(periods=200)
@@ -376,12 +421,12 @@ class TestFeatureReplaySymmetry:
     def test_combined_temporal_and_lag_replay(self, mock_model_cls):
         """When both temporal and lag are in metadata, both should be applied."""
         mock_model = _make_mock_model()
-        mock_model.metadata["added_columns"] = {
+        mock_model.metadata.added_columns = {
             "temporal": ["month_sin"],
             "lag": ["lag_24", "roll_mean_24"],
         }
-        mock_model.metadata["lags"] = [24]
-        mock_model.metadata["windows"] = [24]
+        mock_model.metadata.lags = [24]
+        mock_model.metadata.windows = [24]
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(periods=200)

@@ -9,13 +9,12 @@ import pandas as pd
 import pytest
 import requests
 
-from u2.defaults import (
-    DEFAULT_WEATHER_DAILY_VARS,
-    DEFAULT_WEATHER_HOURLY_VARS,
-    WEATHER_FORECAST_API_URL,
-    WEATHER_HISTORICAL_API_URL,
-)
+from u2.constants.envs import settings
+from u2.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
 from u2.features.weather import enrich_weather, fetch_weather
+
+WEATHER_FORECAST_API_URL = settings.weather_forecast_api_url
+WEATHER_HISTORICAL_API_URL = settings.weather_historical_api_url
 
 
 @pytest.mark.unit
@@ -26,7 +25,7 @@ class TestFetchWeather:
         """Hourly frequency should send hourly params."""
         captured_params = {}
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             captured_params.update(params or {})
 
             class MockResp:
@@ -50,7 +49,7 @@ class TestFetchWeather:
         """Daily frequency should send daily params."""
         captured_params = {}
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             captured_params.update(params or {})
 
             class MockResp:
@@ -78,7 +77,7 @@ class TestFetchWeather:
         """Historical mode should call the archive API URL."""
         called_url = []
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             called_url.append(url)
 
             class MockResp:
@@ -100,7 +99,7 @@ class TestFetchWeather:
         """Forecast mode should call the forecast API URL."""
         called_url = []
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             called_url.append(url)
 
             class MockResp:
@@ -121,7 +120,7 @@ class TestFetchWeather:
     def test_converts_time_to_datetime(self, monkeypatch):
         """time column should be converted to datetime."""
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             class MockResp:
                 def raise_for_status(self):
                     pass
@@ -145,7 +144,7 @@ class TestFetchWeather:
     def test_http_error_raises_runtime_error(self, monkeypatch):
         """HTTP errors should be wrapped in RuntimeError."""
 
-        def mock_get(url, params=None):
+        def mock_get(url, params=None, **kwargs):
             raise requests.exceptions.ConnectionError("connection failed")
 
         monkeypatch.setattr("u2.features.weather.requests.get", mock_get)

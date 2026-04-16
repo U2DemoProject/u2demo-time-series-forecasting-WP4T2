@@ -1,0 +1,148 @@
+# Public GitHub Actions CI.
+#
+# This project is developed on an internal GitLab instance and mirrored to
+# GitHub for public releases. This workflow drives the public pipeline;
+# the internal GitLab pipeline lives at .gitlab-ci.yml. Both are
+# intentionally kept in sync.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  POETRY_NO_INTERACTION: "1"
+  POETRY_VIRTUALENVS_IN_PROJECT: "true"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  commit-lint:
+    name: Lint PR title
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Get gitlint version from lock file
+        id: gitlint-version
+        run: |
+          VERSION=$(grep -A1 '^name = "gitlint"' poetry.lock | grep version | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - run: pip install "gitlint==${{ steps.gitlint-version.outputs.version }}"
+
+      - name: Check PR title
+        run: echo "${{ github.event.pull_request.title }}" | gitlint --msg-filename /dev/stdin
+
+  ruff-check:
+    name: Ruff lint
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Get ruff version from lock file
+        id: ruff-version
+        run: |
+          VERSION=$(grep -A1 '^name = "ruff"' poetry.lock | grep version | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - run: pip install "ruff==${{ steps.ruff-version.outputs.version }}"
+      - run: ruff check
+
+  ruff-format:
+    name: Ruff format
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Get ruff version from lock file
+        id: ruff-version
+        run: |
+          VERSION=$(grep -A1 '^name = "ruff"' poetry.lock | grep version | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - run: pip install "ruff==${{ steps.ruff-version.outputs.version }}"
+      - run: ruff format --check
+
+  poetry-lock:
+    name: Poetry lock check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Get Poetry version from pre-commit config
+        id: poetry-version
+        run: |
+          VERSION=$(grep -A1 "python-poetry/poetry$" .pre-commit-config.yaml | grep "rev:" | awk '{print $2}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - run: pip install "poetry==${{ steps.poetry-version.outputs.version }}"
+      - run: poetry check --lock
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Get Poetry version from pre-commit config
+        id: poetry-version
+        run: |
+          VERSION=$(grep -A1 "python-poetry/poetry$" .pre-commit-config.yaml | grep "rev:" | awk '{print $2}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install Poetry
+        run: pip install "poetry==${{ steps.poetry-version.outputs.version }}" poetry-plugin-export
+
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
+          restore-keys: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - run: poetry install --no-root
+      - run: poetry run pytest -m "not e2e and not integration"
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            htmlcov/
+            coverage.xml
+            report.xml

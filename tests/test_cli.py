@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from cli import predict_command, train_command
+from u2.cli import main, predict_command, train_command
 from u2.data_models import ForecastTrainingInput
 
 
@@ -65,7 +65,7 @@ def _make_forecast_json(tmp_path, periods=200):
 class TestTrainCommand:
     """Tests for train_command CLI entry point."""
 
-    @patch("cli.train")
+    @patch("u2.cli.train")
     def test_calls_train_with_validated_input(self, mock_train, tmp_path):
         """train_command should load JSON, validate it, and call train()."""
         path = _make_training_json(tmp_path)
@@ -103,7 +103,7 @@ class TestTrainCommand:
 class TestPredictCommand:
     """Tests for predict_command CLI entry point."""
 
-    @patch("cli.predict")
+    @patch("u2.cli.predict")
     def test_calls_predict_and_writes_output(self, mock_predict, tmp_path):
         """predict_command should call predict() and write forecast JSON to disk."""
         mock_forecast = MagicMock()
@@ -114,7 +114,7 @@ class TestPredictCommand:
         path = _make_forecast_json(tmp_path)
         output_dir = str(tmp_path / "predictions")
 
-        with patch("cli.OUTPUT_PREDICTION_PATH", output_dir):
+        with patch("u2.cli.OUTPUT_DIR", output_dir):
             predict_command(path)
 
         mock_predict.assert_called_once()
@@ -145,3 +145,19 @@ class TestPredictCommand:
 
         with pytest.raises(ValidationError):
             predict_command(path)
+
+
+@pytest.mark.unit
+class TestMain:
+    """Tests for the `main` entry point registered as the `u2` console script."""
+
+    @patch("u2.cli.Fire")
+    def test_main_registers_all_commands(self, mock_fire):
+        """main should dispatch train, predict, and sanity_check via Fire."""
+        main()
+
+        mock_fire.assert_called_once()
+        commands = mock_fire.call_args[0][0]
+        assert set(commands.keys()) == {"sanity_check", "predict", "train"}
+        assert commands["train"] is train_command
+        assert commands["predict"] is predict_command

@@ -11,11 +11,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from u2.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
 from u2.data_models import ForecastInput, ForecastTrainingInput
 from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import (
-    TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
-)
 from u2.model import U2TimeSeriesPredictionModel
 from u2.utils import get_known_covariates, get_min_timeseries_length
 
@@ -150,7 +148,7 @@ class TestEndToEndPipeline:
 
             predict_data = _make_forecast_input(periods=periods, values=values)
             ts2 = U2TimeSeriesPredictionDataset.from_forecast_input(predict_data)
-            ts2.drop_short_timeseries(model2.metadata["min_timeseries_length"])
+            ts2.drop_short_timeseries(model2.metadata.min_timeseries_length)
             ts2.add_temporal()
             ts2.split_past_and_future_dfs(horizon)
 
@@ -215,10 +213,10 @@ class TestEndToEndPipeline:
             model2 = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
             model2.load()
 
-            assert "temporal" in model2.metadata["added_columns"]
-            assert "lag" in model2.metadata["added_columns"]
-            assert model2.metadata["lags"] == lags
-            assert model2.metadata["windows"] == lags
-            assert model2.metadata["frequency"] == "h"
-            assert model2.metadata["horizon"] == horizon
-            assert model2.metadata["min_timeseries_length"] == max(lags) + min_lookback + horizon
+            assert "temporal" in model2.metadata.added_columns
+            assert "lag" in model2.metadata.added_columns
+            assert model2.metadata.lags == lags
+            assert model2.metadata.windows == lags
+            assert model2.metadata.frequency == "h"
+            assert model2.metadata.horizon == horizon
+            assert model2.metadata.min_timeseries_length == max(lags) + min_lookback + horizon

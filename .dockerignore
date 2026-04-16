@@ -1,8 +1,6 @@
-# Ignore everything
+# Ignore everything by default...
 *
 
-# But include the u2 folder and cli.py
+# ...then allow only what the image actually needs.
 !u2/
-!cli.py
 !requirements.txt
-

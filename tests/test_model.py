@@ -14,10 +14,37 @@ from autogluon.timeseries import TimeSeriesPredictor
 from pandas.testing import assert_frame_equal
 
 from tests.conftest import load_training_input_from_json
+from u2.constants.columns import TIME_SERIES_GROUP_COLUMN_NAME
+from u2.constants.paths import LEADERBOARD_FILENAME as MODEL_TRAINING_RESULT_LEADERBOARD_PATH
 from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import MODEL_TRAINING_RESULT_LEADERBOARD_PATH, TIME_SERIES_GROUP_COLUMN_NAME
+from u2.features.names import FeatureName
+from u2.metadata import ModelMetadata, TrainingMetadata
 from u2.model import U2TimeSeriesPredictionModel
 from u2.utils import get_min_timeseries_length
+
+
+def _make_metadata(
+    frequency: str = "h",
+    horizon: int = 24,
+    min_timeseries_length: int = 50,
+) -> ModelMetadata:
+    """Build a minimal valid ModelMetadata for property tests."""
+    return ModelMetadata(
+        version="0.1.0",
+        frequency=frequency,
+        horizon=horizon,
+        min_timeseries_length=min_timeseries_length,
+        added_columns={},
+        lags=[],
+        windows=[],
+        training=TrainingMetadata(
+            start_utc="2023-01-01 00:00:00",
+            end_utc="2023-01-01 00:01:00",
+            min_lookback=50,
+            num_val_windows=1,
+            num_test_windows=1,
+        ),
+    )
 
 
 @pytest.mark.integration
@@ -64,8 +91,8 @@ class TestU2TimeSeriesPredictionModel:
         assert new_model.predictor.freq == freq
         assert new_model.predictor.prediction_length == horizon
         assert new_model.metadata is not None
-        assert new_model.metadata["horizon"] == horizon
-        assert new_model.metadata["frequency"] == freq
+        assert new_model.metadata.horizon == horizon
+        assert new_model.metadata.frequency == freq
 
     def test_predict_returns_correct_format(self, temp_dir: str, json_single_timeseries: str):
         horizon = 5
@@ -153,9 +180,9 @@ class TestU2TimeSeriesPredictionModel:
         reloaded = U2TimeSeriesPredictionModel(model_path)
         reloaded.load()
 
-        assert reloaded.metadata["added_columns"] == expected_added_columns
-        assert reloaded.metadata["lags"] == lags
-        assert reloaded.metadata["windows"] == windows
+        assert reloaded.metadata.added_columns == expected_added_columns
+        assert reloaded.metadata.lags == lags
+        assert reloaded.metadata.windows == windows
 
 
 @pytest.mark.unit
@@ -279,9 +306,9 @@ class TestU2TimeSeriesPredictionModelUnit:
             training_kwargs={},
         )
 
-        assert model.metadata["lags"] == [24, 168]
-        assert model.metadata["windows"] == [24, 168]
-        assert model.metadata["added_columns"]["lag"] == dataset.added_columns["lag"]
+        assert model.metadata.lags == [24, 168]
+        assert model.metadata.windows == [24, 168]
+        assert model.metadata.added_columns["lag"] == dataset.added_columns["lag"]
 
     def test_save_metadata_without_lag_columns(self, tmp_path):
         """_save_metadata without lag features should set lags=[0] and compute min_timeseries_length accordingly."""
@@ -303,8 +330,8 @@ class TestU2TimeSeriesPredictionModelUnit:
             training_kwargs={},
         )
 
-        assert "lags" not in model.metadata
-        assert model.metadata["min_timeseries_length"] == 124  # max([0]) + 100 + 24 (horizon)
+        assert model.metadata.lags == []
+        assert model.metadata.min_timeseries_length == 124  # max([0]) + 100 + 24 (horizon)
 
     def test_save_metadata_single_lag(self, tmp_path):
         """_save_metadata with a single lag should extract it correctly."""
@@ -328,9 +355,9 @@ class TestU2TimeSeriesPredictionModelUnit:
             training_kwargs={"presets": "chronos2"},
         )
 
-        assert model.metadata["lags"] == [7]
-        assert model.metadata["windows"] == [7]
-        assert model.metadata["min_timeseries_length"] == 7 + 30 + 7  # max([7]) + 30 + 7 (horizon)
+        assert model.metadata.lags == [7]
+        assert model.metadata.windows == [7]
+        assert model.metadata.min_timeseries_length == 7 + 30 + 7  # max([7]) + 30 + 7 (horizon)
 
     def test_save_metadata_writes_json_file(self, tmp_path):
         """_save_metadata should write a JSON file to the model directory."""
@@ -364,7 +391,7 @@ class TestU2TimeSeriesPredictionModelUnit:
         model = U2TimeSeriesPredictionModel("/tmp/unloaded")
         dataset = MagicMock()
 
-        with pytest.raises(RuntimeError, match="Predictor not loaded"):
+        with pytest.raises(RuntimeError, match="Predictor is not loaded"):
             model.predict(dataset)
 
     def test_predict_success_path(self):
@@ -502,3 +529,133 @@ class TestU2TimeSeriesPredictionModelUnit:
         )
 
         assert os.path.exists(os.path.join(model_path, MODEL_TRAINING_RESULT_LEADERBOARD_PATH))
+
+    def test_freq_property_returns_metadata_frequency(self):
+        """`freq` should read from ModelMetadata.frequency."""
+        model = U2TimeSeriesPredictionModel("/tmp/freq_prop")
+        model.metadata = _make_metadata(frequency="D")
+
+        assert model.freq == "D"
+
+    def test_freq_property_raises_without_metadata(self):
+        """`freq` should raise when metadata is not loaded."""
+        model = U2TimeSeriesPredictionModel("/tmp/freq_no_meta")
+
+        with pytest.raises(RuntimeError, match="Model metadata is not loaded"):
+            _ = model.freq
+
+    def test_prediction_length_property_returns_metadata_horizon(self):
+        """`prediction_length` should read from ModelMetadata.horizon."""
+        model = U2TimeSeriesPredictionModel("/tmp/pred_len_prop")
+        model.metadata = _make_metadata(horizon=42)
+
+        assert model.prediction_length == 42
+
+    def test_prediction_length_property_raises_without_metadata(self):
+        """`prediction_length` should raise when metadata is not loaded."""
+        model = U2TimeSeriesPredictionModel("/tmp/pred_len_no_meta")
+
+        with pytest.raises(RuntimeError, match="Model metadata is not loaded"):
+            _ = model.prediction_length
+
+    def test_quantile_levels_property_returns_predictor_quantile_levels(self):
+        """`quantile_levels` should read from the loaded predictor."""
+        model = U2TimeSeriesPredictionModel("/tmp/qlevels")
+        mock_predictor = MagicMock()
+        mock_predictor.quantile_levels = [0.1, 0.5, 0.9]
+        model.predictor = mock_predictor
+
+        assert model.quantile_levels == [0.1, 0.5, 0.9]
+
+    def test_quantile_levels_property_raises_without_predictor(self):
+        """`quantile_levels` should raise when predictor is not loaded."""
+        model = U2TimeSeriesPredictionModel("/tmp/qlevels_none")
+
+        with pytest.raises(RuntimeError, match="Predictor is not loaded"):
+            _ = model.quantile_levels
+
+    def test_save_metadata_raises_without_predictor(self, tmp_path):
+        """_save_metadata without a predictor should raise."""
+        model = U2TimeSeriesPredictionModel(str(tmp_path / "no_predictor"))
+        dataset = MagicMock()
+
+        with pytest.raises(RuntimeError, match="Predictor is not loaded"):
+            model._save_metadata(
+                dataset,
+                min_lookback=50,
+                num_val_windows=1,
+                num_test_windows=1,
+                training_start="2023-01-01",
+                training_kwargs={},
+            )
+
+    def test_save_metadata_raises_when_predictor_freq_none(self, tmp_path):
+        """_save_metadata should raise when the predictor reports no frequency."""
+        model = U2TimeSeriesPredictionModel(str(tmp_path / "no_freq"))
+        model.predictor = MagicMock()
+        model.predictor.freq = None
+
+        with pytest.raises(RuntimeError, match="Predictor has no frequency set"):
+            model._save_metadata(
+                MagicMock(),
+                min_lookback=50,
+                num_val_windows=1,
+                num_test_windows=1,
+                training_start="2023-01-01",
+                training_kwargs={},
+            )
+
+    def test_save_leaderboards_raises_without_predictor(self, tmp_path):
+        """_save_leaderboards without a predictor should raise."""
+        model = U2TimeSeriesPredictionModel(str(tmp_path / "lb_no_predictor"))
+
+        with pytest.raises(RuntimeError, match="Predictor is not loaded"):
+            model._save_leaderboards(num_test_windows=1, test_data=MagicMock())
+
+    def test_train_raises_without_predictor(self):
+        """train without a predictor should raise."""
+        model = U2TimeSeriesPredictionModel("/tmp/train_no_predictor")
+        dataset = MagicMock()
+        dataset.df = pd.DataFrame({"time": [1], "value": [1]})
+
+        with pytest.raises(RuntimeError, match="Predictor is not loaded"):
+            model.train(dataset, min_lookback=1, num_val_windows=1, num_test_windows=1)
+
+    def test_load_existing_metadata_shape(self):
+        """ModelMetadata must parse the on-disk JSON shape written by previous versions.
+
+        Guards against breaking already-trained models on disk when the Pydantic
+        model's schema drifts.
+        """
+        legacy_payload = {
+            "version": "0.1.0",
+            "frequency": "h",
+            "horizon": 24,
+            "min_timeseries_length": 124,
+            "added_columns": {
+                "temporal": ["month_sin", "month_cos"],
+                "lag": ["lag_168", "roll_mean_168"],
+            },
+            "lags": [168],
+            "windows": [168],
+            "training": {
+                "start_utc": "2023-01-01 00:00:00",
+                "end_utc": "2023-01-01 00:05:00",
+                "min_lookback": 100,
+                "num_val_windows": 1,
+                "num_test_windows": 1,
+                "kwargs": {"presets": "chronos2"},
+            },
+        }
+
+        parsed = ModelMetadata.model_validate_json(json.dumps(legacy_payload))
+
+        assert parsed.version == "0.1.0"
+        assert parsed.frequency == "h"
+        assert parsed.horizon == 24
+        assert parsed.min_timeseries_length == 124
+        assert parsed.lags == [168]
+        assert parsed.windows == [168]
+        assert parsed.added_columns[FeatureName.TEMPORAL] == ["month_sin", "month_cos"]
+        assert parsed.added_columns[FeatureName.LAG] == ["lag_168", "roll_mean_168"]
+        assert parsed.training.kwargs == {"presets": "chronos2"}

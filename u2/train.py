@@ -1,16 +1,12 @@
 import os
 
-import pandas as pd
-
+from u2.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
+from u2.constants.paths import MODEL_DIR
+from u2.constants.training import DEFAULT_TRAIN_EVAL_METRIC, DEFAULT_TRAIN_MIN_LOOKBACK
 from u2.data_models import ForecastTrainingInput
 from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import (
-    AVAILABLE_FEATURES,
-    DEFAULT_TRAIN_EVAL_METRIC,
-    DEFAULT_TRAIN_MIN_LOOKBACK,
-    MODEL_PATH,
-    TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
-)
+from u2.features.names import FeatureName
+from u2.features.pipeline import apply_features
 from u2.model import U2TimeSeriesPredictionModel
 from u2.utils import get_known_covariates, get_min_timeseries_length
 
@@ -40,40 +36,26 @@ def train(
     time_series = U2TimeSeriesPredictionDataset.from_training_input(data)
 
     model_path = os.path.join(
-        MODEL_PATH,
+        MODEL_DIR,
         f"{data.training_model_config.model_id}_{data.training_model_config.model_version}",
     )
     model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
 
-    features = data.features if "features" in data.model_fields_set else []
-
-    num_weekly_lags = data.num_weekly_lags if "num_weekly_lags" in data.model_fields_set else 0
-
-    for feature in features:
-        if feature not in AVAILABLE_FEATURES:
-            raise ValueError(f"Unrecognized time series feature: {feature}")
-
-    if "temporal" in features:
-        time_series.add_temporal()
-    if "lag" in features:
-        freq_weeks = int(
-            (60 * 60 * 24 * 7) / pd.Timedelta(pd.tseries.frequencies.to_offset(freq=time_series.freq)).total_seconds()
-        )
-        lags = [freq_weeks * (1 + i) for i in range(num_weekly_lags)]
-        time_series.add_lags(
-            lags,
-            lags,  #  Windows does not necessarily need to be the same as lags but up to now it was not found to be necessary for a different value
-        )
-        if not lags:  # num_weekly_lags=0 produces empty list; normalize for downstream min_timeseries_length
-            lags = [0]
+    features = data.features
+    lags: list[int] = [0]
+    if FeatureName.LAG in features:
+        freq_weeks = 60 * 24 * 7 // time_series.freq_minutes
+        computed_lags = [freq_weeks * (1 + i) for i in range(data.num_weekly_lags)]
+        # num_weekly_lags=0 produces empty list; normalize for downstream min_timeseries_length
+        lags = computed_lags or [0]
     else:
-        lags = [0]
-    if "holiday" in features:
-        time_series.add_holidays()
-    if "weather" in features:
-        time_series.add_weather()
+        computed_lags = []
+
+    apply_features(time_series, features, lags=computed_lags, windows=computed_lags)
 
     # Ensure at least 1 step when horizon < freq (e.g. 12h horizon with daily data)
+    if time_series.freq_minutes is None or time_series.freq is None:
+        raise RuntimeError("Frequency is not initialized")
     horizon = max(1, data.time_parameters.horizon_hours * 60 // time_series.freq_minutes)
     min_lookback = data.training_model_config.lookback_steps or DEFAULT_TRAIN_MIN_LOOKBACK
 
@@ -108,7 +90,7 @@ def train(
         quantile_levels=quantile_levels,
     )
 
-    training_kwargs = {
+    training_kwargs: dict[str, str | list[str] | None] = {
         "presets": data.training_model_config.model_preset,
     }
 

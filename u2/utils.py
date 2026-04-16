@@ -1,9 +1,17 @@
+"""Shared helpers: HTTP retry classification, reverse geocoding, covariate selection."""
+
+from typing import TYPE_CHECKING, cast
+
 import requests
 from geopy.geocoders import Nominatim
 from joblib import Memory
+
+if TYPE_CHECKING:
+    from geopy.location import Location as GeopyLocation
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.defaults import CACHE_DIR, NOMINATIM_DOMAIN, NOMINATIM_USER_AGENT_NAME
+from u2.constants.envs import settings
+from u2.constants.paths import CACHE_DIR
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 
@@ -74,8 +82,8 @@ def reverse_geocode(latlon: tuple[float, float]) -> dict:
     """
     ret = {}
 
-    geolocator = Nominatim(domain=NOMINATIM_DOMAIN, user_agent=NOMINATIM_USER_AGENT_NAME)
-    location = geolocator.reverse(latlon, addressdetails=True)
+    geolocator = Nominatim(domain=settings.nominatim_domain, user_agent=settings.nominatim_user_agent_name)
+    location = cast("GeopyLocation | None", geolocator.reverse(latlon, addressdetails=True))
     if location is None:
         raise ValueError(f"Could not geocode location: {latlon}")
 

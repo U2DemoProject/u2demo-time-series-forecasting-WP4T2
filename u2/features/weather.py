@@ -5,17 +5,12 @@ import requests
 from joblib import Memory
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.defaults import (
-    CACHE_DIR,
-    DEFAULT_WEATHER_DAILY_VARS,
-    DEFAULT_WEATHER_HOURLY_VARS,
-    WEATHER_FORECAST_API_URL,
-    WEATHER_HISTORICAL_API_URL,
-)
-from u2.logging_config import logger
+from u2.constants.envs import settings
+from u2.constants.paths import CACHE_DIR
+from u2.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
+from u2.core.logger import logger
 from u2.utils import is_retryable_error
 
-HTTP_GATEWAY_TIMEOUT = 504
 memory = Memory(location=CACHE_DIR, verbose=0)
 
 
@@ -86,10 +81,10 @@ def fetch_weather(
     else:
         raise ValueError(f"Unrecognized frequency `{frequency}`")
 
-    url = WEATHER_FORECAST_API_URL if mode == "forecast" else WEATHER_HISTORICAL_API_URL
+    url = settings.weather_forecast_api_url if mode == "forecast" else settings.weather_historical_api_url
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         payload = response.json()
     except requests.exceptions.RequestException as e:
@@ -163,7 +158,7 @@ def enrich_weather(
         variables = DEFAULT_WEATHER_DAILY_VARS if frequency.endswith("D") else DEFAULT_WEATHER_HOURLY_VARS
 
     df["time_aligned"] = df[time_col].dt.floor("h") if frequency.endswith(("h", "min")) else df[time_col].dt.normalize()
-    enriched_parts = []
+    enriched_parts: list[pd.DataFrame] = []
 
     def _process_subset(df_chunk: pd.DataFrame, mode: str, lat: float, lon: float) -> pd.DataFrame:
         if df_chunk.empty:
@@ -181,10 +176,9 @@ def enrich_weather(
                 frequency=frequency,
                 mode=mode,
             )
-        except Exception as e:
-            error = f"Failed to fetch weather for ({lat}, {lon}) in mode `{mode}`"
-            logger.error(error)
-            raise e
+        except (requests.RequestException, RuntimeError):
+            logger.error(f"Failed to fetch weather for ({lat}, {lon}) in mode `{mode}`")
+            raise
 
         if weather_df.empty:
             error = f"No weather data for ({lat}, {lon}) in mode `{mode}`"

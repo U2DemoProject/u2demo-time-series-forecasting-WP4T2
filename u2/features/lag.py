@@ -23,7 +23,7 @@ class LagFeatureGenerator:
         Working copy of the input DataFrame with added features.
     group_name : str
         Grouping column for computing lag/rolling features.
-    _max_shift : int
+    _max_lag_offset : int
         Maximum number of rows shifted for lag/rolling features; used for trimming.
     added_columns : list[str]
         Names of all feature columns added during processing.
@@ -44,7 +44,7 @@ class LagFeatureGenerator:
         """
         self.df = df.copy()
         self.group_name = group_name
-        self._max_shift = 0
+        self._max_lag_offset = 0
         self.added_columns = []
 
     def create_lag_features(self, column: str, lags: list[int]) -> None:
@@ -63,7 +63,7 @@ class LagFeatureGenerator:
 
         Notes
         -----
-        Updates the internal `_max_shift` to ensure proper trimming in `finalize()`.
+        Updates the internal `_max_lag_offset` to ensure proper trimming in `finalize()`.
 
         """
         if lags != []:
@@ -72,9 +72,9 @@ class LagFeatureGenerator:
                 self.df[lag_column_name] = self.df.groupby(self.group_name)[column].shift(lag)
                 self.added_columns.append(lag_column_name)
 
-            self._max_shift = max(self._max_shift, int(max(lags)))
+            self._max_lag_offset = max(self._max_lag_offset, int(max(lags)))
 
-    def create_rolling_stat_features(self, column: str, windows: list, statistics: list[str] = None) -> None:
+    def create_rolling_stat_features(self, column: str, windows: list, statistics: list[str] | None = None) -> None:
         """
         Create rolling statistical features (mean, std, min, max) for a column.
 
@@ -99,7 +99,7 @@ class LagFeatureGenerator:
         Notes
         -----
         - Only implemented statistics ("mean", "std", "min", "max") are allowed.
-        - Updates `_max_shift` based on the largest window size.
+        - Updates `_max_lag_offset` based on the largest window size.
 
         """
         implemented_statistics = ["mean", "std", "min", "max"]
@@ -117,20 +117,20 @@ class LagFeatureGenerator:
                 grouped = self.df.groupby(self.group_name)[column]
                 roll = grouped.shift(1).rolling(window=w)
                 for stat in statistics:
-                    if hasattr(roll, stat):  # pragma: no cover – validated above
+                    if hasattr(roll, stat):  # pragma: no cover - validated above
                         col_name = f"roll_{stat}_{w}"
                         self.df[col_name] = getattr(roll, stat)()
                         self.added_columns.append(col_name)
 
-            self._max_shift = max(self._max_shift, int(max(windows)))
+            self._max_lag_offset = max(self._max_lag_offset, int(max(windows)))
 
     def finalize(self) -> tuple[pd.DataFrame, list[str]]:
         """
         Finalize and return the processed DataFrame and added feature column names.
 
-        This method trims the first `_max_shift` rows of each group to ensure that
-        all lag and rolling feature values are valid (i.e., no NaNs introduced by
-        shifting or rolling).
+        This method trims the first `_max_lag_offset` rows of each group to
+        ensure that all lag and rolling feature values are valid (i.e., no NaNs
+        introduced by shifting or rolling).
 
         Returns
         -------
@@ -140,9 +140,6 @@ class LagFeatureGenerator:
             - A list of the added feature column names
 
         """
-        return (
-            self.df.groupby(self.group_name)
-            .apply(lambda g: g.iloc[self._max_shift :], include_groups=False)
-            .reset_index(level=0)
-            .reset_index(drop=True)
-        ), self.added_columns
+        trimmed = [group.iloc[self._max_lag_offset :] for _, group in self.df.groupby(self.group_name)]
+        result = pd.concat(trimmed, ignore_index=True) if trimmed else self.df.iloc[0:0]
+        return result, self.added_columns

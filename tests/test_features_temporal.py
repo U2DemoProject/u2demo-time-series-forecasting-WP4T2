@@ -8,12 +8,17 @@ import pandas as pd
 import pytest
 
 from tests.conftest import load_training_input_from_json
-from u2.defaults import (
+from u2.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.features.temporal import add_day_of_week_onehot, add_encoded_time_features, cos_transformer, sin_transformer
+from u2.features.temporal import (
+    add_day_of_week_onehot,
+    add_encoded_time_features,
+    cos_transformer,
+    sin_transformer,
+)
 
 
 @pytest.mark.unit

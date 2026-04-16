@@ -7,8 +7,15 @@ import pandas as pd
 import pytest
 import requests
 
-from u2.defaults import DEFAULT_HOLIDAY_TYPES, PUBLIC_HOLIDAY_API_URL
-from u2.features.holidays import encode_holiday_types, fetch_holidays_by_year, merge_holidays_with_dataframe
+from u2.constants.envs import settings
+from u2.constants.holidays import DEFAULT_HOLIDAY_TYPES
+from u2.features.holidays import (
+    encode_holiday_types,
+    fetch_holidays_by_year,
+    merge_holidays_with_dataframe,
+)
+
+PUBLIC_HOLIDAY_API_URL = settings.public_holiday_api_url
 
 
 @pytest.mark.unit
@@ -203,7 +210,7 @@ class TestFetchHolidaysByYear:
             def json(self):
                 return holiday_json
 
-        monkeypatch.setattr("u2.features.holidays.requests.get", lambda url: MockResp())
+        monkeypatch.setattr("u2.features.holidays.requests.get", lambda url, **kwargs: MockResp())
 
         # Bypass the joblib cache and tenacity retry decorators
         inner = fetch_holidays_by_year.__wrapped__.__wrapped__

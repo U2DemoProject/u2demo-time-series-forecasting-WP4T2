@@ -8,7 +8,12 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from u2.utils import get_known_covariates, get_min_timeseries_length, is_retryable_error, reverse_geocode
+from u2.utils import (
+    get_known_covariates,
+    get_min_timeseries_length,
+    is_retryable_error,
+    reverse_geocode,
+)
 
 
 @pytest.mark.unit

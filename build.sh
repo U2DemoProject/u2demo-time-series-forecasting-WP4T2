@@ -82,3 +82,14 @@ if [ "$TAG_LATEST" = true ]; then
     echo "Also tagged as: u2/time-series-prediction:latest"
 fi
 
+# Best-effort sanity check: verify the freshly-built image can launch the CLI.
+# Failures here do not abort the build — the image is still built and tagged —
+# but they surface CUDA / dependency regressions early.
+echo ""
+echo "Running post-build sanity check..."
+if docker run --rm "$IMAGE_NAME" sanity_check; then
+    echo "Sanity check passed."
+else
+    echo "Warning: sanity check failed. The image was still built, but verify dependencies and CUDA availability before publishing."
+fi
+

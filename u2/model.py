@@ -1,19 +1,18 @@
-import json
 import os
 import threading
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
-from u2 import __version__
+from u2._version import __version__
+from u2.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
+from u2.constants.paths import LEADERBOARD_FILENAME, METADATA_FILENAME
+from u2.core.logger import logger
 from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.defaults import (
-    MODEL_METADATA_PATH,
-    MODEL_TRAINING_RESULT_LEADERBOARD_PATH,
-    TIME_SERIES_TIMESTAMP_COLUMN_NAME,
-)
-from u2.logging_config import logger
+from u2.features.names import FeatureName
+from u2.metadata import ModelMetadata, TrainingMetadata
 from u2.utils import get_min_timeseries_length
 
 
@@ -50,9 +49,34 @@ class U2TimeSeriesPredictionModel:
     def __init__(self, model_path: str, require_version_match: bool = True):
         self.model_path = model_path
         self.require_version_match = require_version_match
-        self.predictor: TimeSeriesPredictor = None
+        self.predictor: TimeSeriesPredictor | None = None
         self.lock = threading.RLock()
-        self.metadata = None
+        self.metadata: ModelMetadata | None = None
+
+    def _require_metadata(self) -> ModelMetadata:
+        if self.metadata is None:
+            raise RuntimeError("Model metadata is not loaded")
+        return self.metadata
+
+    def _require_predictor(self) -> TimeSeriesPredictor:
+        if self.predictor is None:
+            raise RuntimeError("Predictor is not loaded")
+        return self.predictor
+
+    @property
+    def freq(self) -> str:
+        """Frequency string (e.g., ``"h"``, ``"D"``) recorded at training time."""
+        return self._require_metadata().frequency
+
+    @property
+    def prediction_length(self) -> int:
+        """Forecast horizon in steps, recorded at training time."""
+        return self._require_metadata().horizon
+
+    @property
+    def quantile_levels(self) -> list[float]:
+        """Quantile levels configured on the loaded predictor."""
+        return self._require_predictor().quantile_levels
 
     def _save_leaderboards(self, num_test_windows: int, test_data: TimeSeriesDataFrame) -> None:
         """
@@ -71,11 +95,12 @@ class U2TimeSeriesPredictionModel:
             Writes a CSV file with averaged metrics to the model directory.
 
         """
-        horizon = self.predictor.prediction_length
+        predictor = self._require_predictor()
+        horizon = predictor.prediction_length
         cutoffs = range(-num_test_windows * horizon, -horizon + 1, horizon)
-        leaderboards = []
+        leaderboards: list[pd.DataFrame] = []
         for cutoff in cutoffs:
-            lb = self.predictor.leaderboard(test_data, cutoff=cutoff, extra_metrics=["WAPE"], silent=True)
+            lb = predictor.leaderboard(test_data, cutoff=cutoff, extra_metrics=["WAPE"], silent=True)
             lb["cutoff"] = cutoff
             leaderboards.append(lb)
 
@@ -89,7 +114,7 @@ class U2TimeSeriesPredictionModel:
         # Reorder columns to match the original leaderboard order
         original_cols = leaderboards[0].columns
         avg_lb = avg_lb.reindex(columns=[col for col in original_cols if col in avg_lb.columns])
-        avg_lb.to_csv(f"{self.model_path}/{MODEL_TRAINING_RESULT_LEADERBOARD_PATH}", index=None)
+        avg_lb.to_csv(f"{self.model_path}/{LEADERBOARD_FILENAME}", index=False)
 
     def _save_metadata(
         self,
@@ -125,41 +150,40 @@ class U2TimeSeriesPredictionModel:
             `self.metadata`.
 
         """
+        predictor = self._require_predictor()
+        if predictor.freq is None:
+            raise RuntimeError("Predictor has no frequency set")
         os.makedirs(f"{self.model_path}/u2", exist_ok=True)
 
-        metadata = {
-            "version": __version__,
-            "training": {
-                "start_utc": training_start,
-                "end_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
-                "min_lookback": min_lookback,
-                "num_val_windows": num_val_windows,
-                "num_test_windows": num_test_windows,
-                "kwargs": training_kwargs,
-            },
-            "frequency": self.predictor.freq,
-            "horizon": self.predictor.prediction_length,
-            "added_columns": time_series.added_columns,
-        }
+        lag_columns = time_series.added_columns.get(FeatureName.LAG, [])
+        lags = [int(col.split("_")[1]) for col in lag_columns if col.startswith("lag_")]
+        # There are other "roll_" columns, but they all have the same ending numbers as "roll_mean_"
+        windows = [int(col.split("_")[2]) for col in lag_columns if col.startswith("roll_mean_")]
 
-        if "lag" in time_series.added_columns:
-            lags = [int(col.split("_")[1]) for col in time_series.added_columns["lag"] if col.startswith("lag_")]
-            # There are other "roll_" columns, but they all have the same ending numbers as "roll_mean_"
-            windows = [
-                int(col.split("_")[2]) for col in time_series.added_columns["lag"] if col.startswith("roll_mean_")
-            ]
-
-            metadata["lags"] = lags
-            metadata["windows"] = windows
-        else:
-            lags = [0]
         # Include horizon so metadata threshold matches the one used during training validation
-        metadata["min_timeseries_length"] = get_min_timeseries_length(
-            lags=lags, min_lookback=min_lookback, horizon=self.predictor.prediction_length
+        min_timeseries_length = get_min_timeseries_length(
+            lags=lags or [0], min_lookback=min_lookback, horizon=predictor.prediction_length
         )
 
-        with open(f"{self.model_path}/{MODEL_METADATA_PATH}", "w") as f:
-            json.dump(metadata, f, indent=4)
+        metadata = ModelMetadata(
+            version=__version__,
+            frequency=predictor.freq,
+            horizon=predictor.prediction_length,
+            min_timeseries_length=min_timeseries_length,
+            added_columns={FeatureName(k): v for k, v in time_series.added_columns.items()},
+            lags=lags,
+            windows=windows,
+            training=TrainingMetadata(
+                start_utc=training_start,
+                end_utc=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                min_lookback=min_lookback,
+                num_val_windows=num_val_windows,
+                num_test_windows=num_test_windows,
+                kwargs=training_kwargs,
+            ),
+        )
+
+        Path(f"{self.model_path}/{METADATA_FILENAME}").write_text(metadata.model_dump_json(indent=4))
         self.metadata = metadata
 
     def new(
@@ -169,7 +193,7 @@ class U2TimeSeriesPredictionModel:
         prediction_length: int,
         freq: str,
         eval_metric: str,
-        quantile_levels: list[float] = None,
+        quantile_levels: list[float] | None = None,
     ) -> None:
         """
         Create a new predictor instance at `model_path` with the given settings.
@@ -227,11 +251,12 @@ class U2TimeSeriesPredictionModel:
                 return
             logger.info(f"Loading predictor from {self.model_path}")
             self.predictor = TimeSeriesPredictor.load(self.model_path, require_version_match=self.require_version_match)
-            with open(f"{self.model_path}/{MODEL_METADATA_PATH}") as f:
-                self.metadata = json.load(f)
+            self.metadata = ModelMetadata.model_validate_json(
+                Path(f"{self.model_path}/{METADATA_FILENAME}").read_text()
+            )
             try:
                 self.predictor.persist()
-            except Exception as e:
+            except (AttributeError, NotImplementedError, RuntimeError) as e:
                 logger.warning("persist() failed or not supported: %s", e)
             logger.info("Predictor loaded and persisted")
 
@@ -255,12 +280,12 @@ class U2TimeSeriesPredictionModel:
                 return
             try:
                 self.predictor.unpersist()
-            except Exception as e:
+            except (AttributeError, NotImplementedError, RuntimeError) as e:
                 logger.warning("unpersist() failed: %s", e)
             self.predictor = None
             logger.info("Predictor unloaded")
 
-    def reload(self, new_path: str = None) -> None:
+    def reload(self, new_path: str | None = None) -> None:
         """
         Reload the predictor from disk, optionally using a new model path.
 
@@ -293,7 +318,7 @@ class U2TimeSeriesPredictionModel:
         num_val_windows: int,
         num_test_windows: int,
         save_leaderboards: bool = False,
-        training_kwargs: dict = None,
+        training_kwargs: dict | None = None,
     ) -> None:
         """
         Fit the predictor using the provided dataset and training configuration.
@@ -323,23 +348,22 @@ class U2TimeSeriesPredictionModel:
         None
 
         """
+        predictor = self._require_predictor()
         if training_kwargs is None:
             training_kwargs = {"presets": "chronos2"}
 
-        df = time_series.df.copy()
-
-        if time_series.freq != self.predictor.freq:
+        if time_series.freq != predictor.freq:
             logger.warning(
-                f"Input data has frequency of {time_series.freq} while the model is set with a frequency of {self.predictor.freq}.\n"
+                f"Input data has frequency of {time_series.freq} while the model is set with a frequency of {predictor.freq}.\n"
                 "The data will be resampled to match, make sure it is intended"
             )
-        df = TimeSeriesDataFrame(df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
+        df = TimeSeriesDataFrame(time_series.df.copy(), timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
 
         train_data, test_data = df.train_test_split(
-            prediction_length=min_lookback + self.predictor.prediction_length * num_test_windows
+            prediction_length=min_lookback + predictor.prediction_length * num_test_windows
         )
         training_start = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        self.predictor.fit(
+        predictor.fit(
             train_data=train_data, num_val_windows=num_val_windows, refit_every_n_windows=None, **training_kwargs
         )
 
@@ -380,9 +404,7 @@ class U2TimeSeriesPredictionModel:
 
         """
         with self.lock:
-            if self.predictor is None:
-                raise RuntimeError("Predictor not loaded")
-
+            predictor = self._require_predictor()
             df = TimeSeriesDataFrame(time_series.df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
             future_df = (
                 TimeSeriesDataFrame(time_series.future_df, timestamp_column=TIME_SERIES_TIMESTAMP_COLUMN_NAME)
@@ -390,4 +412,4 @@ class U2TimeSeriesPredictionModel:
                 else None
             )
 
-            return self.predictor.predict(data=df, known_covariates=future_df, **kwargs)
+            return predictor.predict(data=df, known_covariates=future_df, **kwargs)

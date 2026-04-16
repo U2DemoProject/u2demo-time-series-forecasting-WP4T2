@@ -28,8 +28,9 @@ select = [
     "RET", # flake8-return
     "TID", # flake8-tidy-imports
     "TCH", # flake8-type-checking
-    "DJ", # flake8-django
+    "S", # flake8-bandit (security)
     "B", # flake8-bugbear
+    "RUF", # ruff-specific rules
 ]
 
 ignore = [
@@ -59,9 +60,13 @@ ignore = [
 
 extend-safe-fixes = ["C", "D", "A", "W291"]
 
+[lint.pydocstyle]
+convention = "numpy"
+
 [lint.extend-per-file-ignores]
 "**/__init__.py" = ["D"]
-"tests/test_*.py" = ["D", "ANN001", "ANN201", "ANN202", "ARG001", "ARG002", "ARG005"]
+"tests/test_*.py" = ["D", "ANN001", "ANN201", "ANN202", "ARG001", "ARG002", "ARG005", "S101", "S108", "RUF043", "RUF059"]
+"scripts/*.py" = ["T20"]
 
 [format]
 quote-style = "double"

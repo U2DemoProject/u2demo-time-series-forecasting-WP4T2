@@ -2,8 +2,22 @@
 
 # U2 Time Series Prediction
 
-[![coverage](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/badges/main/coverage.svg)](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/-/commits/main)
-[![pipeline](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/badges/main/pipeline.svg)](https://git.eifer.kit.edu/dev-team/u2-demo/u2-time-series-prediction-final/-/pipelines)
+[![CI](https://github.com/U2DemoProject/u2demo-time-series-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/U2DemoProject/u2demo-time-series-prediction/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/U2DemoProject/u2demo-time-series-prediction/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Coverage](https://codecov.io/gh/U2DemoProject/u2demo-time-series-prediction/branch/main/graph/badge.svg)](https://codecov.io/gh/U2DemoProject/u2demo-time-series-prediction)
+
+## Contents
+
+- [Install](#install)
+- [Use](#use)
+  - [Environment variables](#environment-variables)
+  - [Sanity check](#sanity-check)
+  - [Train](#train)
+  - [Predict](#predict)
+- [Build](#build)
+- [Test](#test)
+- [Troubleshooting](#troubleshooting)
 
 This document has been produced in the context of the U2Demo project. Views and opinions expressed in this document are
 however those of the authors only and do not necessarily reflect those of the European Union or the European Climate,
@@ -37,6 +51,12 @@ This repo uses Poetry version **2.2.1**
 ```sh
 pip install poetry
 poetry install
+```
+
+To run the [example notebooks](examples/), install the optional `examples` group:
+
+```sh
+poetry install --with examples
 ```
 
 ### As Docker image
@@ -82,9 +102,10 @@ set the .env vars for all run types, copy the file `.env_template` to `.env` and
 - **`WEATHER_FORECAST_API_URL`** default: `https://api.open-meteo.com/v1/forecast`
     - URL for getting weather forceast data
 
-- **`CACHE_DIR=".cache"`**
-    - Folder which will store cached calls to all external APIs
+- **`CACHE_DIR`** default: `.cache`
+    - Folder which will store cached calls to all external APIs (Nominatim, Open-Meteo, Nager.Date)
 
+> **Note:** All environment variables are optional. The application falls back to the built-in defaults shown above when a variable is unset.
 
 ### Sanity check
 
@@ -93,7 +114,7 @@ Check availability of CUDA and compatible devices with:
 #### Python:
 
 ```sh
-python cli.py sanity_check
+poetry run u2 sanity_check
 ```
 
 #### Docker:
@@ -105,168 +126,58 @@ docker run --rm --gpus all u2/time-series-prediction:latest sanity_check
 #### Docker Compose:
 
 ```sh
-docker compose run --rm u2-time-series-prediction sanity_check
+docker compose run --rm u2demo-time-series-prediction sanity_check
 ```
+
+### Input format
+
+Both `train` and `predict` take a single JSON file as input. The JSON must validate against
+the `ForecastTrainingInput` or `ForecastInput` Pydantic models.
+
+Minimal training payload:
+
+```json
+{
+  "forecast_type": "stochastic",
+  "time_parameters": { "timestep_minutes": 60, "horizon_hours": 24 },
+  "model_config": {
+    "model_id": "dummy_model",
+    "model_version": "1.0.0",
+    "model_preset": "fast_training",
+    "lookback_steps": 500
+  },
+  "target_series": {
+    "series_id": "meter_pavilion_1",
+    "variable_name": "energyImportTotal",
+    "unit": "kWh",
+    "training_values": [
+      { "time": "2024-09-18T13:00:00", "value": 25.57 },
+      { "time": "2024-09-18T14:00:00", "value": 31.16 }
+    ]
+  },
+  "location": { "latitude": 52.07, "longitude": 4.30 },
+  "features": ["temporal", "lag", "holiday", "weather"],
+  "num_weekly_lags": 2
+}
+```
+
+The `features` list controls which feature engineering steps run. To train fully offline
+(no calls to Nager.Date, Open-Meteo, or Nominatim), use `["temporal", "lag"]` and omit
+`location`.
+
+Trained models are written to `MODEL_DIR/<model_id>_<model_version>/` (default
+`./models/dummy_model_1.0.0/`). Forecast outputs are written under `OUTPUT_DIR`
+(default `./output/`) as `<model_id>_<model_version>_<forecast_date>.json`.
 
 ### Train
 
-The `train` command trains a new U2 time-series prediction model from an input CSV file. It loads and validates the input time-series CSV, engineers temporal, lag, holiday, and weather features, and constructs and fits an AutoGluon `TimeSeriesPredictor`.
-
-#### Required Parameters
-
-- **`time_series_csv`** (str)
-  - Path to the input time-series CSV file.
-
-- **`model_path`** (str)
-  - Directory where the trained model and metadata will be stored.
-
-- **`horizon`** (int)
-  - Forecast horizon (number of future steps to predict).
-
-- **`num_weekly_lags`** (int)
-  - Number of weekly multiples used to derive lag and rolling windows.
-
-#### Optional Parameters
-
-- **`features`** (list[str], default: `["temporal", "lag", "holiday", "weather"]`)
-  - Features to include in training. Can be chosen from `["temporal", "lag", "holiday", "weather"]`. Default uses all features.
-
-- **`num_test_windows`** (int, default: `1`)
-  - Number of backtesting windows used for evaluation when training.
-
-- **`min_lookback`** (int, default: `1000`)
-  - Minimum lookback used to form the training backtest split.
-
-- **`location_col_name`** (str, default: `"location"`)
-  - Name of the location column in the input CSV.
-
-- **`timestamp_col_name`** (str, default: `"timestamp"`)
-  - Name of the timestamp column in the input CSV.
-
-- **`predict_value_col_name`** (str, default: `"value"`)
-  - Name of the target value column in the input CSV.
-
-- **`group_col_name`** (str, default: `"item_id"`)
-  - Column identifying independent time-series groups.
-
-- **`save_leaderboards`** (bool, default: `False`)
-  - If `True`, writes averaged leaderboard metrics to the model directory.
-
-- **`from_csv_kwargs`** (dict, optional)
-  - Additional keyword arguments passed to `U2TimeSeriesPredictionDataset.from_csv()`.
-
-- **`training_kwargs`** (dict, optional)
-  - Additional keyword arguments forwarded to `TimeSeriesPredictor.fit()`. Useful for passing AutoGluon-specific parameters like `presets` (e.g., `{'presets': 'fast_training'}`).
-
-**Note 1:** All the below examples are using specially selected parameters to make training fast and easy with sample
-data
-
-**Note 2:** Training a model via a docker container can produce model directories and files that are owned by `root`,
-which can cause access problems later when performing inference, usually in the form of a `PermissionError`. After
-training with a docker container, it is advised to change the ownership of the resultant folder with the command:
-
-```sh
-sudo chown -R <your user name> models/<created model folder>
-```
-
-#### Python:
-
-```sh
-python cli.py \
-  train \
-  "data/dummy_train.csv" \
-  "models/dummy_model" \
-  24 \
-  2 \
-  --predict-value-col-name="kwh_meter_value" \
-  --save-leaderboards=True \
-  --training_kwargs="{'presets': 'fast_training'}" \
-  --min-lookback=500
-```
-
-#### Docker:
-
-```sh
-docker run --rm \
-  --gpus all \
-  -e LOG_LEVEL=INFO \
-  -e NOMINATIM_DOMAIN=nominatim.openstreetmap.org \
-  -e NOMINATIM_USER_AGENT_NAME=u2-demo-time-series-prediction \
-  -e PUBLIC_HOLIDAY_API_URL=https://date.nager.at/api/v3 \
-  -e WEATHER_HISTORICAL_API_URL=https://archive-api.open-meteo.com/v1/archive \
-  -e WEATHER_FORECAST_API_URL=https://api.open-meteo.com/v1/forecast \
-  -e CACHE_DIR=.cache \
-  -v "$(pwd)/data:/app/data" \
-  -v "$(pwd)/models:/app/models" \
-  -v "$(pwd)/output:/app/output" \
-  u2/time-series-prediction:latest \
-  train \
-  "data/dummy_train.csv" \
-  "models/dummy_model" \
-  24 \
-  2 \
-  --predict-value-col-name="kwh_meter_value" \
-  --save-leaderboards=True \
-  --training_kwargs="{'presets': 'fast_training'}" \
-  --min-lookback=500
-```
-
-#### Docker Compose:
-
-```sh
-docker compose run --rm u2-time-series-prediction \
-  train \
-  "data/dummy_train.csv" \
-  "models/dummy_model" \
-  24 \
-  2 \
-  --predict-value-col-name="kwh_meter_value" \
-  --save-leaderboards=True \
-  --training_kwargs="{'presets': 'fast_training'}" \
-  --min-lookback=500
-```
-
-### Predict
-
-The `predict` command runs a full time-series forecasting pipeline on a CSV input file and writes predictions to disk. It loads a previously trained U2 time-series prediction model, loads and validates the input time-series CSV, ensures the model and data use the same timestamp frequency, extends the dataset by the forecast horizon, applies all required feature-engineering steps (temporal, lag, holiday, weather), splits past and future data for prediction, runs the model's `predict()` method, and saves the resulting forecast to a CSV file.
-
-#### Required Parameters
-
-- **`time_series_csv`** (str)
-  - Path to the input time-series CSV file.
-
-- **`model_path`** (str)
-  - Path to the saved U2 model directory.
-
-#### Optional Parameters
-
-- **`output_prediction_csv`** (str, optional)
-  - Path where the prediction CSV should be saved. If `None`, a timestamped filename under `./output` is generated (format: `output/prediction_YYYYMMDD-HHMMSS.csv`).
-
-- **`location_col_name`** (str, default: `"location"`)
-  - Name of the location column in the input CSV.
-
-- **`timestamp_col_name`** (str, default: `"timestamp"`)
-  - Name of the timestamp column in the input CSV.
-
-- **`predict_value_col_name`** (str, default: `"value"`)
-  - Name of the target value column in the input CSV.
-
-- **`group_col_name`** (str, default: `"item_id"`)
-  - Column identifying independent time-series groups.
-
-- **`from_csv_kwargs`** (dict, optional)
-  - Additional keyword arguments passed to `U2TimeSeriesPredictionDataset.from_csv()`.
+The `train` command reads a `ForecastTrainingInput` JSON file, validates it, engineers
+temporal/lag/holiday/weather features, and fits an AutoGluon `TimeSeriesPredictor`.
 
 #### Python
 
-(All examples can only be run if `dummy_model` already exists in `./models`. Run one of the above `train` command examples to generate it.)
-
 ```sh
-python cli.py \
-  predict \
-  data/dummy_predict.csv \
-  "models/dummy_model"
+poetry run u2 train data/dummy_train.json
 ```
 
 #### Docker
@@ -274,29 +185,52 @@ python cli.py \
 ```sh
 docker run --rm \
   --gpus all \
-  -e LOG_LEVEL=INFO \
-  -e NOMINATIM_DOMAIN=nominatim.openstreetmap.org \
-  -e NOMINATIM_USER_AGENT_NAME=u2-demo-time-series-prediction \
-  -e PUBLIC_HOLIDAY_API_URL=https://date.nager.at/api/v3 \
-  -e WEATHER_HISTORICAL_API_URL=https://archive-api.open-meteo.com/v1/archive \
-  -e WEATHER_FORECAST_API_URL=https://api.open-meteo.com/v1/forecast \
-  -e CACHE_DIR=.cache \
+  --user "$(id -u):$(id -g)" \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/models:/app/models" \
   -v "$(pwd)/output:/app/output" \
   u2/time-series-prediction:latest \
-  predict \
-  data/dummy_predict.csv \
-  "models/dummy_model"
+  train data/dummy_train.json
 ```
 
 #### Docker Compose
 
 ```sh
-docker compose run --rm u2-time-series-prediction \
-  predict \
-  "data/dummy_predict.csv" \
-  "models/dummy_model"
+docker compose run --rm u2demo-time-series-prediction train data/dummy_train.json
+```
+
+### Predict
+
+The `predict` command reads a `ForecastInput` JSON file, loads the matching trained model
+from `MODEL_DIR/<model_id>_<model_version>/`, replays the exact same feature engineering
+pipeline used at training time, and writes a `Forecast` JSON under `OUTPUT_DIR`.
+
+(All examples below assume `dummy_model_1.0.0` already exists in `./models`. Run the `train`
+command above once to generate it.)
+
+#### Python
+
+```sh
+poetry run u2 predict data/dummy_predict.json
+```
+
+#### Docker
+
+```sh
+docker run --rm \
+  --gpus all \
+  --user "$(id -u):$(id -g)" \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/models:/app/models" \
+  -v "$(pwd)/output:/app/output" \
+  u2/time-series-prediction:latest \
+  predict data/dummy_predict.json
+```
+
+#### Docker Compose
+
+```sh
+docker compose run --rm u2demo-time-series-prediction predict data/dummy_predict.json
 ```
 
 ## Build
@@ -359,3 +293,42 @@ To get a coverage summary (e.g. to paste into a MR description):
 ```sh
 poetry run coverage report --format=markdown
 ```
+
+## Troubleshooting
+
+### `PermissionError` on model files after training in Docker
+
+Pass `--user "$(id -u):$(id -g)"` to `docker run` so the container writes bind-mounted
+files (under `./models`, `./output`, `./.cache`) as your host user instead of `root`.
+The Docker examples above already include this flag.
+
+If you inherit a model directory that was created without that flag, fix ownership once with:
+
+```sh
+sudo chown -R "$(id -u):$(id -g)" models/<model_id>_<model_version>
+```
+
+### CUDA / GPU not detected inside Docker
+
+If `u2 sanity_check` reports no CUDA devices, install the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+and confirm the container is launched with `--gpus all`.
+
+### `dummy_predict.json` weather fetch fails with 400
+
+`dummy_predict.json` contains hardcoded timestamps. The Open-Meteo forecast API only serves
+data within ~3 months of today, so if the file has gone stale you will see a `400 Bad Request`
+when running `poetry run u2 predict data/dummy_predict.json`.
+
+Refresh the timestamps with:
+
+```sh
+poetry run python scripts/refresh_dummy_predict.py
+```
+
+### External API rate limits
+
+Holiday and weather features call third-party APIs (Nager.Date, Open-Meteo, Nominatim).
+Calls are cached on disk under `CACHE_DIR` (default `./.cache/`) and retried with
+exponential backoff. To run completely offline, set `"features": ["temporal", "lag"]`
+in your training input JSON and omit the `location` field.

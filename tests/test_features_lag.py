@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from tests.conftest import load_training_input_from_json
-from u2.defaults import (
+from u2.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,

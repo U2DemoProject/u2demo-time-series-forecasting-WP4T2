@@ -1,16 +1,46 @@
+# Python
 venv/
 .venv/
-*__pycache__*
-.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# Environment
 .env
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+report.xml
+htmlcov/
+
+# Linting / Type checking
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Data & Models — ignore ad-hoc user data; keep reference samples & schemas
+data/*
+!data/.gitkeep
+!data/dummy_train.json
+!data/dummy_predict.json
+models/*
+output/
+
+# Cache
+.cache/
+
+# IDE
+.idea/
 .vscode/
 .tool-versions
 *.Identifier
-models/*
 examples/models/*
-data/*
-output/
-coverage.xml
-report.xml
-.coverage
-htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
