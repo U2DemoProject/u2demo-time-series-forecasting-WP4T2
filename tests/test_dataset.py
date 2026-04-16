@@ -1,4 +1,4 @@
-"""Tests for u2.dataset module.
+"""Tests for u2demo_time_series_forecasting.dataset module.
 
 Covers DataFrame construction from training/forecast inputs, short time-series filtering, horizon extension, past/future splitting, all feature-engineering entry points (temporal, lags, holidays, weather), prediction timestamp correctness, train/predict feature symmetry, time gaps, and multi-group prediction pipeline behavior. Holiday and weather calls are monkeypatched to avoid external API calls.
 """
@@ -13,13 +13,13 @@ import pytest
 from pydantic import ValidationError
 
 from tests.conftest import load_training_input_from_json
-from u2.constants.columns import (
+from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.data_models import ForecastInput, ForecastTrainingInput, TimeValue
-from u2.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput, TimeValue
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
 
 
 @pytest.mark.unit
@@ -225,7 +225,7 @@ class TestU2TimeSeriesPredictionDataset:
             df2["holiday_bank"] = 0
             return df2, ["holiday_public", "holiday_bank"]
 
-        monkeypatch.setattr("u2.dataset.merge_holidays_with_dataframe", fake_merge_holidays)
+        monkeypatch.setattr("u2demo_time_series_forecasting.dataset.merge_holidays_with_dataframe", fake_merge_holidays)
 
         dataset.add_holidays()
 
@@ -248,7 +248,7 @@ class TestU2TimeSeriesPredictionDataset:
             df2["temperature_2m"] = 1.23
             return df2, ["temperature_2m"]
 
-        monkeypatch.setattr("u2.dataset.enrich_weather", fake_enrich_weather)
+        monkeypatch.setattr("u2demo_time_series_forecasting.dataset.enrich_weather", fake_enrich_weather)
 
         dataset.final_timestamp = dataset.df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].max()
         dataset.freq = dataset.freq or "h"
@@ -643,7 +643,7 @@ class TestU2TimeSeriesPredictionDataset:
         def patched_merge(*args, **kwargs):
             return pd.DataFrame()
 
-        monkeypatch.setattr("u2.dataset.pd.merge", patched_merge)
+        monkeypatch.setattr("u2demo_time_series_forecasting.dataset.pd.merge", patched_merge)
 
         with pytest.raises(ValueError, match="The input data is empty"):
             U2TimeSeriesPredictionDataset.from_forecast_input(data)

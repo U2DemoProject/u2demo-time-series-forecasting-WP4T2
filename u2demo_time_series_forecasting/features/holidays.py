@@ -5,10 +5,10 @@ from joblib import Memory
 from sklearn.preprocessing import MultiLabelBinarizer
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.constants.envs import settings
-from u2.constants.holidays import DEFAULT_HOLIDAY_TYPES
-from u2.constants.paths import CACHE_DIR
-from u2.utils import is_retryable_error, reverse_geocode
+from u2demo_time_series_forecasting.constants.envs import settings
+from u2demo_time_series_forecasting.constants.holidays import DEFAULT_HOLIDAY_TYPES
+from u2demo_time_series_forecasting.constants.paths import CACHE_DIR
+from u2demo_time_series_forecasting.utils import is_retryable_error, reverse_geocode
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 

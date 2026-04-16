@@ -1,6 +1,6 @@
 import logging
 
-from u2.constants.envs import settings
+from u2demo_time_series_forecasting.constants.envs import settings
 
 logger = logging.getLogger("u2")
 logger.setLevel(settings.log_level)

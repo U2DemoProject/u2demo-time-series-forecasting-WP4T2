@@ -1,4 +1,4 @@
-"""Tests for u2.features.holidays module.
+"""Tests for u2demo_time_series_forecasting.features.holidays module.
 
 Covers fetch_holidays_by_year (Nager.Date API), encode_holiday_types (one-hot encoding), merge_holidays_with_dataframe (geocode -> fetch -> filter -> encode -> merge), and API schema drift detection. External API calls are mocked in unit tests.
 """
@@ -7,9 +7,9 @@ import pandas as pd
 import pytest
 import requests
 
-from u2.constants.envs import settings
-from u2.constants.holidays import DEFAULT_HOLIDAY_TYPES
-from u2.features.holidays import (
+from u2demo_time_series_forecasting.constants.envs import settings
+from u2demo_time_series_forecasting.constants.holidays import DEFAULT_HOLIDAY_TYPES
+from u2demo_time_series_forecasting.features.holidays import (
     encode_holiday_types,
     fetch_holidays_by_year,
     merge_holidays_with_dataframe,
@@ -91,7 +91,7 @@ class TestMergeHolidaysWithDataframe:
         df = self._make_hourly_df()
 
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "de", "region_code": "DE-BW"},
         )
 
@@ -104,7 +104,7 @@ class TestMergeHolidaysWithDataframe:
             }
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda cc, year: holiday_data,
         )
 
@@ -118,11 +118,11 @@ class TestMergeHolidaysWithDataframe:
         df = self._make_hourly_df(start="2023-03-15", periods=24)
 
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "de", "region_code": "DE-BW"},
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda cc, year: pd.DataFrame({"date": ["2023-01-01"], "types": [["Public"]], "counties": [None]}),
         )
 
@@ -136,11 +136,11 @@ class TestMergeHolidaysWithDataframe:
         df = self._make_hourly_df(periods=72)
 
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "de", "region_code": None},
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda cc, year: pd.DataFrame({"date": ["2023-01-01"], "types": [["Public"]], "counties": [None]}),
         )
 
@@ -153,7 +153,7 @@ class TestMergeHolidaysWithDataframe:
         df = self._make_hourly_df(start="2023-01-06", periods=24)
 
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "de", "region_code": "DE-BW"},
         )
 
@@ -165,7 +165,7 @@ class TestMergeHolidaysWithDataframe:
             }
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda cc, year: holidays,
         )
 
@@ -178,11 +178,11 @@ class TestMergeHolidaysWithDataframe:
         df = self._make_hourly_df(periods=24)
 
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "de", "region_code": None},
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda cc, year: pd.DataFrame({"date": ["2023-01-01"], "types": [["Public"]], "counties": [None]}),
         )
 
@@ -210,7 +210,9 @@ class TestFetchHolidaysByYear:
             def json(self):
                 return holiday_json
 
-        monkeypatch.setattr("u2.features.holidays.requests.get", lambda url, **kwargs: MockResp())
+        monkeypatch.setattr(
+            "u2demo_time_series_forecasting.features.holidays.requests.get", lambda url, **kwargs: MockResp()
+        )
 
         # Bypass the joblib cache and tenacity retry decorators
         inner = fetch_holidays_by_year.__wrapped__.__wrapped__
@@ -234,7 +236,7 @@ class TestHolidayMergeRowIntegrity:
         that each date maps to exactly one row of encoded holiday indicators.
         """
         monkeypatch.setattr(
-            "u2.features.holidays.reverse_geocode",
+            "u2demo_time_series_forecasting.features.holidays.reverse_geocode",
             lambda latlon: {"country_code": "DE", "region_code": "DE-BW"},
         )
 
@@ -246,7 +248,7 @@ class TestHolidayMergeRowIntegrity:
             ]
         )
         monkeypatch.setattr(
-            "u2.features.holidays.fetch_holidays_by_year",
+            "u2demo_time_series_forecasting.features.holidays.fetch_holidays_by_year",
             lambda country_code, year: holiday_data,
         )
 

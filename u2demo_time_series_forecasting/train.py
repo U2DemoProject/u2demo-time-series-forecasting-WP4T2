@@ -1,14 +1,14 @@
 import os
 
-from u2.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
-from u2.constants.paths import MODEL_DIR
-from u2.constants.training import DEFAULT_TRAIN_EVAL_METRIC, DEFAULT_TRAIN_MIN_LOOKBACK
-from u2.data_models import ForecastTrainingInput
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.names import FeatureName
-from u2.features.pipeline import apply_features
-from u2.model import U2TimeSeriesPredictionModel
-from u2.utils import get_known_covariates, get_min_timeseries_length
+from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
+from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
+from u2demo_time_series_forecasting.constants.training import DEFAULT_TRAIN_EVAL_METRIC, DEFAULT_TRAIN_MIN_LOOKBACK
+from u2demo_time_series_forecasting.data_models import ForecastTrainingInput
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.names import FeatureName
+from u2demo_time_series_forecasting.features.pipeline import apply_features
+from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
 
 
 def train(

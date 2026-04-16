@@ -1,7 +1,7 @@
 import torch
 import torch.version  # required for pyright so `torch.version.cuda` is statically known
 
-from u2.core.logger import logger
+from u2demo_time_series_forecasting.core.logger import logger
 
 
 def sanity_check() -> None:

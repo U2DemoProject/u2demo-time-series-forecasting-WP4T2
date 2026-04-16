@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from u2.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
-from u2.data_models import ForecastInput, ForecastTrainingInput
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.model import U2TimeSeriesPredictionModel
-from u2.utils import get_known_covariates, get_min_timeseries_length
+from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
+from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
 
 # ── helpers ──────────────────────────────────────────────────────────────────────
 

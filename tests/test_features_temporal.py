@@ -1,4 +1,4 @@
-"""Tests for u2.features.temporal module.
+"""Tests for u2demo_time_series_forecasting.features.temporal module.
 
 Covers sin/cos transformer construction and numerical correctness, the add_encoded_time_features pipeline (expected column names, value ranges, absence of nulls for both hourly and daily fixtures), DST/timezone boundary handling, and degenerate input robustness.
 """
@@ -8,12 +8,12 @@ import pandas as pd
 import pytest
 
 from tests.conftest import load_training_input_from_json
-from u2.constants.columns import (
+from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.features.temporal import (
+from u2demo_time_series_forecasting.features.temporal import (
     add_day_of_week_onehot,
     add_encoded_time_features,
     cos_transformer,

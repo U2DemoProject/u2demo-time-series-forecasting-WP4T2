@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.names import FeatureName
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.names import FeatureName
 
 
 def apply_features(

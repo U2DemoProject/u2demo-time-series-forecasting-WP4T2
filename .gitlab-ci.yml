@@ -33,6 +33,9 @@ variables:
       fi
     - export PATH="$CI_PROJECT_DIR/.poetry-home/bin:$PATH"
     - poetry install --no-root
+    # PyPI serves CUDA-enabled torch on Linux (~821 MB + ~1.8 GB of nvidia-* libs).
+    # CI has no GPU, so replace with the CPU-only wheel to shrink the venv cache.
+    - poetry run pip install torch --force-reinstall --index-url https://download.pytorch.org/whl/cpu
   tags:
     - kvm_runner_1
 

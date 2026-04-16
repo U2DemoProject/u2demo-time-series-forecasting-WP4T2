@@ -1,4 +1,4 @@
-"""Tests for u2.utils module.
+"""Tests for u2demo_time_series_forecasting.utils module.
 
 Covers retry-eligibility logic (HTTP status codes, exception types), known-covariate filtering by horizon and feature family, min-timeseries-length calculation from lag/window lists, and reverse geocoding.
 """
@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from u2.utils import (
+from u2demo_time_series_forecasting.utils import (
     get_known_covariates,
     get_min_timeseries_length,
     is_retryable_error,
@@ -155,7 +155,9 @@ class TestReverseGeocode:
         mock_geolocator = Mock()
         mock_geolocator.reverse.return_value = mock_location
 
-        monkeypatch.setattr("u2.utils.Nominatim", lambda domain, user_agent: mock_geolocator)
+        monkeypatch.setattr(
+            "u2demo_time_series_forecasting.utils.Nominatim", lambda domain, user_agent: mock_geolocator
+        )
         # Bypass joblib and tenacity caching/retry decorators by calling the wrapped function
         inner = reverse_geocode.__wrapped__.__wrapped__
 
@@ -169,7 +171,9 @@ class TestReverseGeocode:
         mock_geolocator = Mock()
         mock_geolocator.reverse.return_value = None
 
-        monkeypatch.setattr("u2.utils.Nominatim", lambda domain, user_agent: mock_geolocator)
+        monkeypatch.setattr(
+            "u2demo_time_series_forecasting.utils.Nominatim", lambda domain, user_agent: mock_geolocator
+        )
         inner = reverse_geocode.__wrapped__.__wrapped__
 
         with pytest.raises(ValueError, match="Could not geocode location"):
@@ -183,7 +187,9 @@ class TestReverseGeocode:
         mock_geolocator = Mock()
         mock_geolocator.reverse.return_value = mock_location
 
-        monkeypatch.setattr("u2.utils.Nominatim", lambda domain, user_agent: mock_geolocator)
+        monkeypatch.setattr(
+            "u2demo_time_series_forecasting.utils.Nominatim", lambda domain, user_agent: mock_geolocator
+        )
         inner = reverse_geocode.__wrapped__.__wrapped__
 
         result = inner((10.0, 20.0))

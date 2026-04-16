@@ -1,4 +1,4 @@
-"""Tests for u2.features.lag module.
+"""Tests for u2demo_time_series_forecasting.features.lag module.
 
 Covers lag column creation, rolling-statistic columns, correct numerical values, copy semantics (input DataFrame is not mutated), trimming by max shift, edge cases with empty lag/window lists, time gaps, and degenerate inputs.
 """
@@ -8,12 +8,12 @@ import pandas as pd
 import pytest
 
 from tests.conftest import load_training_input_from_json
-from u2.constants.columns import (
+from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.features.lag import LagFeatureGenerator
+from u2demo_time_series_forecasting.features.lag import LagFeatureGenerator
 
 
 @pytest.mark.unit

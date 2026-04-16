@@ -1,4 +1,4 @@
-"""Tests for u2.features.weather module.
+"""Tests for u2demo_time_series_forecasting.features.weather module.
 
 Covers fetch_weather (Open-Meteo API), enrich_weather (split historical/forecast, fetch both, merge), and API schema drift detection. External API calls are mocked in unit tests.
 """
@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 import requests
 
-from u2.constants.envs import settings
-from u2.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
-from u2.features.weather import enrich_weather, fetch_weather
+from u2demo_time_series_forecasting.constants.envs import settings
+from u2demo_time_series_forecasting.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
+from u2demo_time_series_forecasting.features.weather import enrich_weather, fetch_weather
 
 WEATHER_FORECAST_API_URL = settings.weather_forecast_api_url
 WEATHER_HISTORICAL_API_URL = settings.weather_historical_api_url
@@ -37,7 +37,7 @@ class TestFetchWeather:
 
             return MockResp()
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         result = fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-02", ["temperature_2m"], "h")
 
@@ -61,7 +61,7 @@ class TestFetchWeather:
 
             return MockResp()
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-02", ["temperature_2m_max"], "D")
 
@@ -89,7 +89,7 @@ class TestFetchWeather:
 
             return MockResp()
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-02", ["temperature_2m"], "h", mode="historical")
 
@@ -111,7 +111,7 @@ class TestFetchWeather:
 
             return MockResp()
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-02", ["temperature_2m"], "h", mode="forecast")
 
@@ -135,7 +135,7 @@ class TestFetchWeather:
 
             return MockResp()
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         result = fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-01", ["temperature_2m"], "h")
 
@@ -147,7 +147,7 @@ class TestFetchWeather:
         def mock_get(url, params=None, **kwargs):
             raise requests.exceptions.ConnectionError("connection failed")
 
-        monkeypatch.setattr("u2.features.weather.requests.get", mock_get)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.requests.get", mock_get)
 
         with pytest.raises(RuntimeError, match="Failed to fetch data"):
             fetch_weather(48.0, 9.0, "2023-01-01", "2023-01-02", ["temperature_2m"], "h")
@@ -176,7 +176,7 @@ class TestEnrichWeather:
                 data[v] = [20.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
     def test_enriches_with_default_hourly_variables(self, monkeypatch):
         """Should add default hourly weather variables when none specified."""
@@ -201,7 +201,7 @@ class TestEnrichWeather:
                 data[v] = [10.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         result_df, added_vars = enrich_weather(df, "time", (48.0, 9.0), None, "D")
 
@@ -222,7 +222,7 @@ class TestEnrichWeather:
                 data[v] = [20.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         enrich_weather(df, "time", (48.0, 9.0), present_time, "h")
 
@@ -242,7 +242,7 @@ class TestEnrichWeather:
                 data[v] = [20.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         enrich_weather(df, "time", (48.0, 9.0), None, "h")
 
@@ -283,7 +283,7 @@ class TestEnrichWeather:
                 data[v] = [20.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         result_df, _ = enrich_weather(df, "time", (48.0, 9.0), present_time, "h")
 
@@ -298,7 +298,7 @@ class TestEnrichWeather:
         def mock_fetch(lat, lon, start_date, end_date, variables, frequency, mode="historical"):
             raise RuntimeError("API down")
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         with pytest.raises(RuntimeError, match="API down"):
             enrich_weather(df, "time", (48.0, 9.0), None, "h")
@@ -310,7 +310,7 @@ class TestEnrichWeather:
         def mock_fetch(lat, lon, start_date, end_date, variables, frequency, mode="historical"):
             return pd.DataFrame()
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         with pytest.raises(ValueError, match="No weather data"):
             enrich_weather(df, "time", (48.0, 9.0), None, "h")
@@ -327,7 +327,7 @@ class TestEnrichWeather:
                 data[v] = [10.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
 
         result_df, added_vars = enrich_weather(df, "time", (48.0, 9.0), None, "h", variables=custom_vars)
 
@@ -373,7 +373,7 @@ class TestEnrichWeatherTimezone:
                 data[v] = [20.0] * len(times)
             return pd.DataFrame(data)
 
-        monkeypatch.setattr("u2.features.weather.fetch_weather", mock_fetch)
+        monkeypatch.setattr("u2demo_time_series_forecasting.features.weather.fetch_weather", mock_fetch)
         return modes_called
 
     def test_naive_present_time_before_2022_uses_all_historical(self, monkeypatch):

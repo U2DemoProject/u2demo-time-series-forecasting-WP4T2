@@ -1,4 +1,4 @@
-"""Tests for u2.model module.
+"""Tests for u2demo_time_series_forecasting.model module.
 
 Covers the full lifecycle of U2TimeSeriesPredictionModel: initialization, save/load round-trips, prediction output format, and guard-rails (predict before load). Uses real AutoGluon training on small fixtures to exercise integration paths.
 """
@@ -14,13 +14,15 @@ from autogluon.timeseries import TimeSeriesPredictor
 from pandas.testing import assert_frame_equal
 
 from tests.conftest import load_training_input_from_json
-from u2.constants.columns import TIME_SERIES_GROUP_COLUMN_NAME
-from u2.constants.paths import LEADERBOARD_FILENAME as MODEL_TRAINING_RESULT_LEADERBOARD_PATH
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.names import FeatureName
-from u2.metadata import ModelMetadata, TrainingMetadata
-from u2.model import U2TimeSeriesPredictionModel
-from u2.utils import get_min_timeseries_length
+from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_GROUP_COLUMN_NAME
+from u2demo_time_series_forecasting.constants.paths import (
+    LEADERBOARD_FILENAME as MODEL_TRAINING_RESULT_LEADERBOARD_PATH,
+)
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.names import FeatureName
+from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
+from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.utils import get_min_timeseries_length
 
 
 def _make_metadata(

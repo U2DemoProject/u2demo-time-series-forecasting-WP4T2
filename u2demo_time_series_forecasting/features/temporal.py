@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import FunctionTransformer, SplineTransformer
 
-from u2.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
+from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
 
 
 def sin_transformer(period: int) -> FunctionTransformer:

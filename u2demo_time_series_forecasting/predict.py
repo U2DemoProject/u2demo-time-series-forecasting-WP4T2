@@ -1,16 +1,16 @@
 import os
 from datetime import UTC, datetime
 
-from u2.constants.columns import (
+from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.constants.paths import MODEL_DIR
-from u2.data_models import Forecast, ForecastedTimeValue, ForecastInput, ForecastSeries
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.pipeline import apply_features
-from u2.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
+from u2demo_time_series_forecasting.data_models import Forecast, ForecastedTimeValue, ForecastInput, ForecastSeries
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.pipeline import apply_features
+from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
 
 
 def predict(data: ForecastInput) -> Forecast:

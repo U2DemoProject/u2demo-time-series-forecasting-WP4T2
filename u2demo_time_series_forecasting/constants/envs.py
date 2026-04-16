@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from u2.constants.paths import BASEDIR
+from u2demo_time_series_forecasting.constants.paths import BASEDIR
 
 
 class Settings(BaseSettings):

@@ -2,5 +2,5 @@
 *
 
 # ...then allow only what the image actually needs.
-!u2/
+!u2demo_time_series_forecasting/
 !requirements.txt

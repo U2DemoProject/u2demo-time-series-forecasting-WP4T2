@@ -125,9 +125,11 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
-          restore-keys: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
       - run: poetry install --no-root
+      # PyPI serves CUDA-enabled torch on Linux (~821 MB + ~1.8 GB of nvidia-* libs).
+      # CI has no GPU, so replace with the CPU-only wheel to shrink the venv cache.
+      - run: poetry run pip install torch --force-reinstall --index-url https://download.pytorch.org/whl/cpu
       - run: poetry run pytest -m "not e2e and not integration"
 
       - name: Upload coverage to Codecov

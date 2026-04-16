@@ -93,7 +93,7 @@ When contributing a bug fix, please include a regression test. When adding a fea
 ## Project Structure
 
 ```
-u2/
+u2demo_time_series_forecasting/
 ├── __init__.py      # Public API (train, predict, data models, FeatureName, ModelMetadata)
 ├── _version.py      # Single __version__ source
 ├── cli.py           # `u2` command-line entry point (see [project.scripts] in pyproject.toml)
@@ -113,4 +113,4 @@ tests/
 
 ## External API Dependencies
 
-Holiday and weather features call external APIs (Nager.Date, Open-Meteo, Nominatim). These calls use tenacity retry logic and joblib disk caching. For local development, see `.env_template` for configurable API URLs, which are loaded via `u2.constants.envs.Settings` (Pydantic Settings).
+Holiday and weather features call external APIs (Nager.Date, Open-Meteo, Nominatim). These calls use tenacity retry logic and joblib disk caching. For local development, see `.env_template` for configurable API URLs, which are loaded via `u2demo_time_series_forecasting.constants.envs.Settings` (Pydantic Settings).

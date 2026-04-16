@@ -1,4 +1,4 @@
-"""Tests for u2.features.pipeline.apply_features.
+"""Tests for u2demo_time_series_forecasting.features.pipeline.apply_features.
 
 Covers the shared feature-engineering dispatcher used by both train and predict:
 enum coercion, per-feature delegation, and the lag-requires-lags-and-windows guard.
@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from u2.data_models import ForecastInput, ForecastTrainingInput
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.names import FeatureName
-from u2.features.pipeline import apply_features
+from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.names import FeatureName
+from u2demo_time_series_forecasting.features.pipeline import apply_features
 
 
 @pytest.mark.unit
@@ -172,7 +172,7 @@ class TestTrainPredictLagSymmetry:
 
     def test_lag_columns_round_trip_through_metadata(self):
         # Step 1: build a training dataset and apply the lag pipeline using
-        # the same lag derivation that u2.train.train() uses for hourly data.
+        # the same lag derivation that u2demo_time_series_forecasting.train.train() uses for hourly data.
         train_ds = U2TimeSeriesPredictionDataset.from_training_input(_training_input_with_lag(periods=2000))
         hourly_steps_per_week = 168
         num_weekly_lags = 2
@@ -182,7 +182,7 @@ class TestTrainPredictLagSymmetry:
         train_lag_columns = sorted(train_ds.added_columns[FeatureName.LAG])
 
         # Step 2: project added columns back into the (lags, windows) tuples
-        # that u2.model._save_metadata() persists into ModelMetadata.
+        # that u2demo_time_series_forecasting.model._save_metadata() persists into ModelMetadata.
         persisted_lags = sorted(int(c.split("_")[1]) for c in train_lag_columns if c.startswith("lag_"))
         persisted_windows = sorted(int(c.split("_")[2]) for c in train_lag_columns if c.startswith("roll_mean_"))
         assert persisted_lags == sorted(computed_lags), (
@@ -193,7 +193,7 @@ class TestTrainPredictLagSymmetry:
         )
 
         # Step 3: build a fresh forecast dataset and replay apply_features
-        # using only the persisted metadata, exactly like u2.predict.predict().
+        # using only the persisted metadata, exactly like u2demo_time_series_forecasting.predict.predict().
         forecast_ds = U2TimeSeriesPredictionDataset.from_forecast_input(_forecast_input_with_lag(periods=2000))
         apply_features(forecast_ds, [FeatureName.LAG], lags=persisted_lags, windows=persisted_windows)
         forecast_lag_columns = sorted(forecast_ds.added_columns[FeatureName.LAG])

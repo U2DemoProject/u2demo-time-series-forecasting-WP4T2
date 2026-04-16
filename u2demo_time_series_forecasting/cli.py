@@ -3,12 +3,12 @@ import os
 
 from fire import Fire
 
-from u2.constants.paths import OUTPUT_DIR
-from u2.core.logger import logger
-from u2.data_models import ForecastInput, ForecastTrainingInput
-from u2.diagnostic import sanity_check
-from u2.predict import predict
-from u2.train import train
+from u2demo_time_series_forecasting.constants.paths import OUTPUT_DIR
+from u2demo_time_series_forecasting.core.logger import logger
+from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
+from u2demo_time_series_forecasting.diagnostic import sanity_check
+from u2demo_time_series_forecasting.predict import predict
+from u2demo_time_series_forecasting.train import train
 
 
 def predict_command(data_json_path: str) -> None:
@@ -29,7 +29,7 @@ def predict_command(data_json_path: str) -> None:
     ----------
     data_json_path : str
         Path to a JSON file matching the ``ForecastInput`` schema
-        (see ``u2/data_models.py``).
+        (see ``u2demo_time_series_forecasting/data_models.py``).
 
     Returns
     -------
@@ -70,7 +70,7 @@ def train_command(
     ----------
     data_json_path : str
         Path to a JSON file matching the ``ForecastTrainingInput`` schema
-        (see ``u2/data_models.py``).
+        (see ``u2demo_time_series_forecasting/data_models.py``).
 
     Returns
     -------

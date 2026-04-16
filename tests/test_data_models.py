@@ -1,4 +1,4 @@
-"""Tests for u2.data_models module.
+"""Tests for u2demo_time_series_forecasting.data_models module.
 
 Covers validation boundaries, required fields, type coercion, and serialization round-trips for all Pydantic models.
 """
@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from u2.data_models import (
+from u2demo_time_series_forecasting.data_models import (
     Forecast,
     ForecastedTimeValue,
     ForecastExogenousSeries,

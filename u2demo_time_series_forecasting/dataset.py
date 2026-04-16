@@ -6,23 +6,23 @@ from typing import Self
 import pandas as pd
 from joblib import Memory
 
-from u2.constants.columns import (
+from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
     TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
-from u2.constants.paths import CACHE_DIR
-from u2.core.logger import logger
-from u2.data_models import (
+from u2demo_time_series_forecasting.constants.paths import CACHE_DIR
+from u2demo_time_series_forecasting.core.logger import logger
+from u2demo_time_series_forecasting.data_models import (
     ForecastExogenousSeries,
     ForecastInput,
     ForecastTrainingInput,
     TrainingExogenousSeries,
 )
-from u2.features.holidays import merge_holidays_with_dataframe
-from u2.features.lag import LagFeatureGenerator
-from u2.features.temporal import add_encoded_time_features
-from u2.features.weather import enrich_weather
+from u2demo_time_series_forecasting.features.holidays import merge_holidays_with_dataframe
+from u2demo_time_series_forecasting.features.lag import LagFeatureGenerator
+from u2demo_time_series_forecasting.features.temporal import add_encoded_time_features
+from u2demo_time_series_forecasting.features.weather import enrich_weather
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 

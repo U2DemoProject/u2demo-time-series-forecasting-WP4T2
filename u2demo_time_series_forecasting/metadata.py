@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from u2.features.names import FeatureName
+from u2demo_time_series_forecasting.features.names import FeatureName
 
 
 class TrainingMetadata(BaseModel):

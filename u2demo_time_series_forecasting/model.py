@@ -6,14 +6,14 @@ from pathlib import Path
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
-from u2._version import __version__
-from u2.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
-from u2.constants.paths import LEADERBOARD_FILENAME, METADATA_FILENAME
-from u2.core.logger import logger
-from u2.dataset import U2TimeSeriesPredictionDataset
-from u2.features.names import FeatureName
-from u2.metadata import ModelMetadata, TrainingMetadata
-from u2.utils import get_min_timeseries_length
+from u2demo_time_series_forecasting._version import __version__
+from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
+from u2demo_time_series_forecasting.constants.paths import LEADERBOARD_FILENAME, METADATA_FILENAME
+from u2demo_time_series_forecasting.core.logger import logger
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.features.names import FeatureName
+from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
+from u2demo_time_series_forecasting.utils import get_min_timeseries_length
 
 
 class U2TimeSeriesPredictionModel:

@@ -5,11 +5,11 @@ import requests
 from joblib import Memory
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from u2.constants.envs import settings
-from u2.constants.paths import CACHE_DIR
-from u2.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
-from u2.core.logger import logger
-from u2.utils import is_retryable_error
+from u2demo_time_series_forecasting.constants.envs import settings
+from u2demo_time_series_forecasting.constants.paths import CACHE_DIR
+from u2demo_time_series_forecasting.constants.weather import DEFAULT_WEATHER_DAILY_VARS, DEFAULT_WEATHER_HOURLY_VARS
+from u2demo_time_series_forecasting.core.logger import logger
+from u2demo_time_series_forecasting.utils import is_retryable_error
 
 memory = Memory(location=CACHE_DIR, verbose=0)
 

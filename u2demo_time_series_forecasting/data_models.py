@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, StringConstraints
 
-from u2.features.names import FeatureName
+from u2demo_time_series_forecasting.features.names import FeatureName
 
 type QuantileKey = Annotated[str, StringConstraints(pattern=r"^(0(\.\d+)?|1(\.0+)?)$")]
 type QuantileLevel = Annotated[float, Field(ge=0, le=1)]

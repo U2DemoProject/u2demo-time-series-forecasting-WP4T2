@@ -1,5 +1,5 @@
 [project]
-name = "u2"
+name = "u2demo-time-series-forecasting"
 version = "0.1.0"
 description = "Time Series Prediction Algorithm Implementation for U2 Demo Project"
 authors = [
@@ -53,7 +53,7 @@ Issues = "https://github.com/U2DemoProject/u2demo-time-series-prediction/issues"
 Documentation = "https://github.com/U2DemoProject/u2demo-time-series-prediction#readme"
 
 [project.scripts]
-u2 = "u2.cli:main"
+u2 = "u2demo_time_series_forecasting.cli:main"
 
 
 [build-system]
@@ -83,8 +83,8 @@ optional = true
 poetry-plugin-export = ">=1.8"
 
 [tool.coverage.run]
-source = ["u2"]
-omit = ["u2/core/logger.py"]
+source = ["u2demo_time_series_forecasting"]
+omit = ["u2demo_time_series_forecasting/core/logger.py"]
 
 [tool.coverage.report]
 show_missing = true
@@ -99,7 +99,7 @@ exclude_lines = [
 output = "coverage.xml"
 
 [tool.pyright]
-include = ["u2"]
+include = ["u2demo_time_series_forecasting"]
 exclude = ["tests"]
 pythonVersion = "3.12"
 venvPath = "."
