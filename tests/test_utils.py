@@ -64,7 +64,7 @@ class TestGetKnownCovariates:
         assert result == []
 
     def test_temporal_features_all_kept(self):
-        """Temporal features are always known at prediction time."""
+        """Temporal features are always known at forecast time."""
         added = {"temporal": ["day_of_week_0", "month_sin", "month_cos"]}
         result = get_known_covariates(added, horizon=24)
         assert set(result) == {"day_of_week_0", "month_sin", "month_cos"}

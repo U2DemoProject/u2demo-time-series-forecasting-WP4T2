@@ -29,7 +29,9 @@ data/*
 !data/dummy_train.json
 !data/dummy_predict.json
 models/*
-output/
+!models/.gitkeep
+output/*
+!output/.gitkeep
 
 # Cache
 .cache/

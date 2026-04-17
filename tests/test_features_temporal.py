@@ -314,7 +314,7 @@ class TestDayOfWeekColumnConsistency:
         """Data covering only Mon-Fri should still produce all 7 day_of_week columns.
 
         pd.get_dummies creates columns only for values present in the data.
-        If training data spans Mon-Fri and prediction data lands on a Saturday,
+        If training data spans Mon-Fri and forecast data lands on a Saturday,
         the model would see a column that didn't exist during training.
         All 7 columns (day_of_week_0 through day_of_week_6) should always be
         created regardless of which days are present in the input.
@@ -333,7 +333,7 @@ class TestDayOfWeekColumnConsistency:
 
         expected_cols = [f"day_of_week_{i}" for i in range(7)]
         for col in expected_cols:
-            assert col in result.columns, f"Missing column {col} for training/prediction consistency"
+            assert col in result.columns, f"Missing column {col} for training/forecasting consistency"
 
 
 @pytest.mark.unit

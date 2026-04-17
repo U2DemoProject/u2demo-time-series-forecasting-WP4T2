@@ -1,21 +1,31 @@
 services:
-  u2demo-time-series-prediction:
-    image: ${U2_TIME_SERIES_PREDICTION_IMAGE:-u2/time-series-prediction:latest}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
+  u2demo-time-series-forecasting:
+    image: ${U2DEMO_TIME_SERIES_FORECASTING_IMAGE:-u2demo/time-series-forecasting:latest}
+    user: "${UID:-0}:${GID:-0}"
+    init: true
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - NOMINATIM_DOMAIN=${NOMINATIM_DOMAIN:-nominatim.openstreetmap.org}
-      - NOMINATIM_USER_AGENT_NAME=${NOMINATIM_USER_AGENT_NAME:-u2-demo-time-series-prediction}
+      - NOMINATIM_USER_AGENT_NAME=${NOMINATIM_USER_AGENT_NAME:-u2demo-time-series-forecasting}
       - PUBLIC_HOLIDAY_API_URL=${PUBLIC_HOLIDAY_API_URL:-https://date.nager.at/api/v3}
       - WEATHER_HISTORICAL_API_URL=${WEATHER_HISTORICAL_API_URL:-https://archive-api.open-meteo.com/v1/archive}
       - WEATHER_FORECAST_API_URL=${WEATHER_FORECAST_API_URL:-https://api.open-meteo.com/v1/forecast}
-      - CACHE_DIR=/app/.cache
     volumes:
       - ./data:/app/data
       - ./models:/app/models
       - ./output:/app/output
-      - ./.cache:/app/.cache
+      - cache:/app/.cache
+
+  u2demo-time-series-forecasting-gpu:
+    extends:
+      service: u2demo-time-series-forecasting
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  cache:

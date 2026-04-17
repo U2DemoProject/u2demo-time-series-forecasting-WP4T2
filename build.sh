@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Build script for Docker image
-# Builds a Docker image for the U2 time-series prediction project using poetry to export dependencies.
+# Builds a Docker image for the U2Demo time-series forecasting project.
 
 set -e
 
@@ -14,7 +14,7 @@ Usage: ./build.sh <tag> [--latest]
 
 Arguments:
     tag         Tag for the Docker image (required)
-                The image will be built as: u2/time-series-prediction:<tag>
+                The image will be built as: u2demo/time-series-forecasting:<tag>
 
 Options:
     --latest    Also tag the built image as 'latest'
@@ -61,30 +61,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-IMAGE_NAME="u2/time-series-prediction:$TAG"
+IMAGE_NAME="u2demo/time-series-forecasting:$TAG"
 
-# Export requirements.txt using poetry
-echo "Exporting requirements.txt using poetry..."
-poetry export -f requirements.txt --output requirements.txt --without-hashes
+# requirements.txt is kept up-to-date by the poetry-export pre-commit hook,
+# so we just verify it exists rather than regenerating it.
+if [ ! -f requirements.txt ]; then
+    echo "Error: requirements.txt not found. Run 'poetry export -f requirements.txt --output requirements.txt --without-hashes' first."
+    exit 1
+fi
 
 # Build the Docker image
 echo "Building Docker image: $IMAGE_NAME"
-docker build -t "$IMAGE_NAME" .
+docker build --platform linux/amd64 -t "$IMAGE_NAME" .
 
 # Tag as latest if requested
 if [ "$TAG_LATEST" = true ]; then
     echo "Tagging image as latest..."
-    docker tag "$IMAGE_NAME" "u2/time-series-prediction:latest"
+    docker tag "$IMAGE_NAME" "u2demo/time-series-forecasting:latest"
 fi
 
 echo "Build complete! Image: $IMAGE_NAME"
 if [ "$TAG_LATEST" = true ]; then
-    echo "Also tagged as: u2/time-series-prediction:latest"
+    echo "Also tagged as: u2demo/time-series-forecasting:latest"
 fi
 
 # Best-effort sanity check: verify the freshly-built image can launch the CLI.
-# Failures here do not abort the build — the image is still built and tagged —
-# but they surface CUDA / dependency regressions early.
+# Runs without --gpus, so it only validates that dependencies load correctly.
+# Failures here do not abort the build — the image is still built and tagged.
 echo ""
 echo "Running post-build sanity check..."
 if docker run --rm "$IMAGE_NAME" sanity_check; then
@@ -92,4 +95,3 @@ if docker run --rm "$IMAGE_NAME" sanity_check; then
 else
     echo "Warning: sanity check failed. The image was still built, but verify dependencies and CUDA availability before publishing."
 fi
-

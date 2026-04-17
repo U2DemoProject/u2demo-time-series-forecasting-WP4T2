@@ -126,18 +126,32 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
 
-      - run: poetry install --no-root
+      - run: poetry install --no-root --with dev
       # PyPI serves CUDA-enabled torch on Linux (~821 MB + ~1.8 GB of nvidia-* libs).
       # CI has no GPU, so replace with the CPU-only wheel to shrink the venv cache.
       - run: poetry run pip install torch --force-reinstall --index-url https://download.pytorch.org/whl/cpu
       - run: poetry run pytest -m "not e2e and not integration"
 
-      - name: Upload coverage to Codecov
+      - name: Extract coverage percentage
+        id: coverage
         if: always()
-        uses: codecov/codecov-action@v5
+        run: |
+          COVERAGE=$(poetry run coverage report --format=total 2>/dev/null || echo "0")
+          echo "total=$COVERAGE" >> "$GITHUB_OUTPUT"
+
+      # Pushes coverage % to a GitHub Gist so shields.io can render a badge.
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && always()
+        uses: schneegans/dynamic-badges-action@v1.7.0
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.COVERAGE_GIST_ID }}
+          filename: coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.total }}%
+          valColorRange: ${{ steps.coverage.outputs.total }}
+          minColorRange: 50
+          maxColorRange: 90
 
       - name: Upload coverage artifacts
         if: always()

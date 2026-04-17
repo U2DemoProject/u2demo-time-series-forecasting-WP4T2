@@ -1,7 +1,7 @@
 [project]
 name = "u2demo-time-series-forecasting"
 version = "0.1.0"
-description = "Time Series Prediction Algorithm Implementation for U2 Demo Project"
+description = "Time Series Forecasting Algorithm Implementation for U2Demo Project"
 authors = [
     {name = "Isaac Boates",email = "isaac.boates@eifer.org"},
     {name = "Maxime Gatineau",email = "maxime.gatineau@eifer.org"},
@@ -48,12 +48,12 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://u2demo.eu/"
-Repository = "https://github.com/U2DemoProject/u2demo-time-series-prediction"
-Issues = "https://github.com/U2DemoProject/u2demo-time-series-prediction/issues"
-Documentation = "https://github.com/U2DemoProject/u2demo-time-series-prediction#readme"
+Repository = "https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2"
+Issues = "https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/issues"
+Documentation = "https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2#readme"
 
 [project.scripts]
-u2 = "u2demo_time_series_forecasting.cli:main"
+u2demo-forecast = "u2demo_time_series_forecasting.cli:main"
 
 
 [build-system]
@@ -62,7 +62,7 @@ build-backend = "poetry.core.masonry.api"
 
 [dependency-groups]
 dev = [
-    "ruff (>=0.14.8,<0.15.0)",
+    "ruff (>=0.15.9,<0.16.0)",
     "pytest (>=9.0.2,<10.0.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
     "gitlint (>=0.19.1,<0.20.0)",
@@ -75,6 +75,9 @@ examples = [
     "ipykernel (>=7.2.0,<8.0.0)",
     "ipywidgets (>=8.1.8,<9.0.0)"
 ]
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.poetry.group.examples]
 optional = true

@@ -13,8 +13,8 @@ import pytest
 
 from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
 from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
-from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
+from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
 from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
 
 # ── helpers ──────────────────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ class TestEndToEndPipeline:
     """Full pipeline: train a real Chronos2 model, save, load, predict."""
 
     def test_train_then_predict_produces_valid_forecast(self):
-        """Train a real model and run prediction on it."""
+        """Train a real model and run forecasting on it."""
 
         with tempfile.TemporaryDirectory() as model_dir:
             rng = np.random.default_rng(42)
@@ -113,7 +113,7 @@ class TestEndToEndPipeline:
             values = rng.random(periods).tolist()
 
             train_data = _make_training_input(periods=periods, features=["temporal"], lookback_steps=50, values=values)
-            ts = U2TimeSeriesPredictionDataset.from_training_input(train_data)
+            ts = U2TimeSeriesForecastingDataset.from_training_input(train_data)
             ts.add_temporal()
 
             horizon = 24
@@ -124,7 +124,7 @@ class TestEndToEndPipeline:
             ts.drop_short_timeseries(min_ts_len)
 
             model_path = f"{model_dir}/test-e2e_1.0.0"
-            model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+            model = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
             model.new(
                 target_column=TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
                 known_covariates_names=known_covariates,
@@ -143,11 +143,11 @@ class TestEndToEndPipeline:
             )
 
             # Predict with a fresh model load
-            model2 = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+            model2 = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
             model2.load()
 
             predict_data = _make_forecast_input(periods=periods, values=values)
-            ts2 = U2TimeSeriesPredictionDataset.from_forecast_input(predict_data)
+            ts2 = U2TimeSeriesForecastingDataset.from_forecast_input(predict_data)
             ts2.drop_short_timeseries(model2.metadata.min_timeseries_length)
             ts2.add_temporal()
             ts2.split_past_and_future_dfs(horizon)
@@ -175,7 +175,7 @@ class TestEndToEndPipeline:
             train_data = _make_training_input(
                 periods=periods, features=["temporal", "lag"], num_weekly_lags=1, lookback_steps=50, values=values
             )
-            ts = U2TimeSeriesPredictionDataset.from_training_input(train_data)
+            ts = U2TimeSeriesForecastingDataset.from_training_input(train_data)
             ts.add_temporal()
 
             freq_weeks = int(
@@ -191,7 +191,7 @@ class TestEndToEndPipeline:
             ts.drop_short_timeseries(min_ts_len)
 
             model_path = f"{model_dir}/test-e2e_1.0.0"
-            model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+            model = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
             model.new(
                 target_column=TIME_SERIES_PREDICT_VALUE_COLUMN_NAME,
                 known_covariates_names=known_covariates,
@@ -210,7 +210,7 @@ class TestEndToEndPipeline:
             )
 
             # Reload from disk
-            model2 = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+            model2 = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
             model2.load()
 
             assert "temporal" in model2.metadata.added_columns

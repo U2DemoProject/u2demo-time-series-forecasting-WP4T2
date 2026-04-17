@@ -4,10 +4,10 @@ from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT
 from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
 from u2demo_time_series_forecasting.constants.training import DEFAULT_TRAIN_EVAL_METRIC, DEFAULT_TRAIN_MIN_LOOKBACK
 from u2demo_time_series_forecasting.data_models import ForecastTrainingInput
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 from u2demo_time_series_forecasting.features.pipeline import apply_features
-from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
 from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
 
 
@@ -15,7 +15,7 @@ def train(
     data: ForecastTrainingInput,
 ) -> None:
     """
-    Train a new U2 time-series prediction model.
+    Train a new U2Demo time-series forecasting model.
 
     This function:
     - Engineers temporal, lag, holiday, and weather features
@@ -33,13 +33,13 @@ def train(
         Trained model artifacts are saved to disk under `model_path`.
 
     """
-    time_series = U2TimeSeriesPredictionDataset.from_training_input(data)
+    time_series = U2TimeSeriesForecastingDataset.from_training_input(data)
 
     model_path = os.path.join(
         MODEL_DIR,
         f"{data.training_model_config.model_id}_{data.training_model_config.model_version}",
     )
-    model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+    model = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
 
     features = data.features
     lags: list[int] = [0]

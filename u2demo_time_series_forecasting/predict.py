@@ -8,9 +8,9 @@ from u2demo_time_series_forecasting.constants.columns import (
 )
 from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
 from u2demo_time_series_forecasting.data_models import Forecast, ForecastedTimeValue, ForecastInput, ForecastSeries
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.pipeline import apply_features
-from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
 
 
 def predict(data: ForecastInput) -> Forecast:
@@ -18,17 +18,17 @@ def predict(data: ForecastInput) -> Forecast:
     Run a full time-series forecasting pipeline.
 
     This function:
-    - Loads a previously trained U2 time-series prediction model
+    - Loads a previously trained U2Demo time-series forecasting model
     - Ensures the model and data use the same timestamp frequency
     - Extends the dataset by the forecast horizon
     - Applies all required feature-engineering steps (temporal, lag, holiday, weather)
-    - Splits past and future data for prediction
+    - Splits past and future data for forecasting
     - Runs the model's `predict()` method
 
     Parameters
     ----------
     data : ForecastInput
-        The input data for making predictions.
+        The input data for making forecasts.
 
     Returns
     -------
@@ -49,14 +49,14 @@ def predict(data: ForecastInput) -> Forecast:
         f"{data.model_id}_{data.model_version}",
     )
 
-    model = U2TimeSeriesPredictionModel(model_path, require_version_match=True)
+    model = U2TimeSeriesForecastingModel(model_path, require_version_match=True)
     model.load()
     if model.metadata is None:
         raise RuntimeError("Model metadata is not loaded")
 
     features = list(model.metadata.added_columns.keys())
 
-    time_series = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+    time_series = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
     time_series.drop_short_timeseries(model.metadata.min_timeseries_length)
 
@@ -84,18 +84,18 @@ def predict(data: ForecastInput) -> Forecast:
 
     quantile_levels = model.quantile_levels
 
-    prediction_df = model.predict(time_series)
-    prediction_df = (
-        prediction_df.reset_index()
+    forecast_df = model.predict(time_series)
+    forecast_df = (
+        forecast_df.reset_index()
         .drop(columns=[TIME_SERIES_GROUP_COLUMN_NAME])
         .rename(columns={"timestamp": TIME_SERIES_TIMESTAMP_COLUMN_NAME, "mean": "value"})
     )
-    prediction_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME] = prediction_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].dt.strftime(
+    forecast_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME] = forecast_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].dt.strftime(
         "%Y-%m-%dT%H:%M:%S%z"
     )
 
-    records = prediction_df.to_dict("records")
-    prediction = [
+    records = forecast_df.to_dict("records")
+    forecasts = [
         ForecastedTimeValue(
             time=r[TIME_SERIES_TIMESTAMP_COLUMN_NAME],
             value=r[TIME_SERIES_PREDICT_VALUE_COLUMN_NAME],
@@ -115,6 +115,6 @@ def predict(data: ForecastInput) -> Forecast:
             asset_type=data.target_series.asset_type,
             unit=data.target_series.unit,
             unitIri=data.target_series.unitIri,
-            values=prediction,
+            values=forecasts,
         ),
     )

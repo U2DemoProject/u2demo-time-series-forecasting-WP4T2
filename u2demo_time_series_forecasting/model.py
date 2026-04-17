@@ -10,16 +10,16 @@ from u2demo_time_series_forecasting._version import __version__
 from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_TIMESTAMP_COLUMN_NAME
 from u2demo_time_series_forecasting.constants.paths import LEADERBOARD_FILENAME, METADATA_FILENAME
 from u2demo_time_series_forecasting.core.logger import logger
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
 from u2demo_time_series_forecasting.utils import get_min_timeseries_length
 
 
-class U2TimeSeriesPredictionModel:
+class U2TimeSeriesForecastingModel:
     """
     Thread-safe wrapper around an AutoGluon TimeSeriesPredictor for loading,
-    unloading, reloading, and running predictions.
+    unloading, reloading, and running forecasts.
 
     This class manages a predictor stored on disk, enforcing serialized access
     using an RLock. It optionally checks version compatibility on load and
@@ -114,11 +114,13 @@ class U2TimeSeriesPredictionModel:
         # Reorder columns to match the original leaderboard order
         original_cols = leaderboards[0].columns
         avg_lb = avg_lb.reindex(columns=[col for col in original_cols if col in avg_lb.columns])
-        avg_lb.to_csv(f"{self.model_path}/{LEADERBOARD_FILENAME}", index=False)
+        leaderboard_path = f"{self.model_path}/{LEADERBOARD_FILENAME}"
+        os.makedirs(os.path.dirname(leaderboard_path), exist_ok=True)
+        avg_lb.to_csv(leaderboard_path, index=False)
 
     def _save_metadata(
         self,
-        time_series: U2TimeSeriesPredictionDataset,
+        time_series: U2TimeSeriesForecastingDataset,
         min_lookback: int,
         num_val_windows: int,
         num_test_windows: int,
@@ -130,7 +132,7 @@ class U2TimeSeriesPredictionModel:
 
         Parameters
         ----------
-        time_series : U2TimeSeriesPredictionDataset
+        time_series : U2TimeSeriesForecastingDataset
             Dataset used for training, providing frequency and added columns.
         min_lookback : int
             Minimum lookback used to form the backtest split.
@@ -153,7 +155,7 @@ class U2TimeSeriesPredictionModel:
         predictor = self._require_predictor()
         if predictor.freq is None:
             raise RuntimeError("Predictor has no frequency set")
-        os.makedirs(f"{self.model_path}/u2", exist_ok=True)
+        os.makedirs(f"{self.model_path}/u2demo", exist_ok=True)
 
         lag_columns = time_series.added_columns.get(FeatureName.LAG, [])
         lags = [int(col.split("_")[1]) for col in lag_columns if col.startswith("lag_")]
@@ -203,7 +205,7 @@ class U2TimeSeriesPredictionModel:
         target_column : str
             Name of the target column in the training data.
         known_covariates_names : list[str]
-            Feature column names considered known at prediction time.
+            Feature column names considered known at forecast time.
         prediction_length : int
             Forecast horizon in steps.
         freq : str
@@ -313,7 +315,7 @@ class U2TimeSeriesPredictionModel:
 
     def train(
         self,
-        time_series: U2TimeSeriesPredictionDataset,
+        time_series: U2TimeSeriesForecastingDataset,
         min_lookback: int,
         num_val_windows: int,
         num_test_windows: int,
@@ -330,7 +332,7 @@ class U2TimeSeriesPredictionModel:
 
         Parameters
         ----------
-        time_series : U2TimeSeriesPredictionDataset
+        time_series : U2TimeSeriesForecastingDataset
             Dataset containing the engineered training DataFrame.
         min_lookback : int
             Minimum lookback used to form the backtest split.
@@ -373,7 +375,7 @@ class U2TimeSeriesPredictionModel:
         if save_leaderboards:
             self._save_leaderboards(num_test_windows, test_data)
 
-    def predict(self, time_series: U2TimeSeriesPredictionDataset, **kwargs) -> TimeSeriesDataFrame:
+    def predict(self, time_series: U2TimeSeriesForecastingDataset, **kwargs) -> TimeSeriesDataFrame:
         """
         Generate forecasts using the loaded TimeSeriesPredictor.
 
@@ -386,7 +388,7 @@ class U2TimeSeriesPredictionModel:
 
         Parameters
         ----------
-        time_series : U2TimeSeriesPredictionDataset
+        time_series : U2TimeSeriesForecastingDataset
             Dataset wrapper containing historical data (`df`) and
             optional future data (`future_df`) in DataFrame format.
         **kwargs

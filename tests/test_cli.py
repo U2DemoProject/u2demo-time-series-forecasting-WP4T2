@@ -7,6 +7,7 @@ functions are mocked to avoid real model training.
 
 import json
 import os
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -107,7 +108,7 @@ class TestPredictCommand:
     def test_calls_predict_and_writes_output(self, mock_predict, tmp_path):
         """predict_command should call predict() and write forecast JSON to disk."""
         mock_forecast = MagicMock()
-        mock_forecast.forecast_date = "2023-01-09T00:00:00"
+        mock_forecast.forecast_date = datetime(2023, 1, 9)
         mock_forecast.model_dump_json.return_value = '{"forecast": "data"}'
         mock_predict.return_value = mock_forecast
 

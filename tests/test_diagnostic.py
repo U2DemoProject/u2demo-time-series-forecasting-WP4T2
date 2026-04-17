@@ -19,7 +19,7 @@ class TestSanityCheck:
 
     def test_logs_cuda_availability(self, caplog):
         """Should log whether CUDA is available."""
-        with caplog.at_level(logging.INFO, logger="U2 Time Series Prediction"):
+        with caplog.at_level(logging.INFO, logger="U2Demo Time Series Forecasting"):
             sanity_check()
 
         assert any("CUDA" in record.message for record in caplog.records)
@@ -28,7 +28,7 @@ class TestSanityCheck:
         """When CUDA is not available, should log that."""
         monkeypatch.setattr("u2demo_time_series_forecasting.diagnostic.torch.cuda.is_available", lambda: False)
 
-        with caplog.at_level(logging.INFO, logger="U2 Time Series Prediction"):
+        with caplog.at_level(logging.INFO, logger="U2Demo Time Series Forecasting"):
             sanity_check()
 
         assert any("CUDA is not available" in record.message for record in caplog.records)
@@ -42,7 +42,7 @@ class TestSanityCheck:
             "u2demo_time_series_forecasting.diagnostic.torch.cuda.get_device_name", lambda i: f"FakeGPU-{i}"
         )
 
-        with caplog.at_level(logging.INFO, logger="U2 Time Series Prediction"):
+        with caplog.at_level(logging.INFO, logger="U2Demo Time Series Forecasting"):
             sanity_check()
 
         messages = [r.message for r in caplog.records]

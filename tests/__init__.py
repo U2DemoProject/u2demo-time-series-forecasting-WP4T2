@@ -1,1 +1,1 @@
-"""Test suite for U2 time-series prediction module."""
+"""Test suite for U2Demo time-series forecasting module."""

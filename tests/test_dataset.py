@@ -1,6 +1,6 @@
 """Tests for u2demo_time_series_forecasting.dataset module.
 
-Covers DataFrame construction from training/forecast inputs, short time-series filtering, horizon extension, past/future splitting, all feature-engineering entry points (temporal, lags, holidays, weather), prediction timestamp correctness, train/predict feature symmetry, time gaps, and multi-group prediction pipeline behavior. Holiday and weather calls are monkeypatched to avoid external API calls.
+Covers DataFrame construction from training/forecast inputs, short time-series filtering, horizon extension, past/future splitting, all feature-engineering entry points (temporal, lags, holidays, weather), forecast timestamp correctness, train/predict feature symmetry, time gaps, and multi-group forecasting pipeline behavior. Holiday and weather calls are monkeypatched to avoid external API calls.
 """
 
 import datetime as dt
@@ -19,12 +19,12 @@ from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
 from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput, TimeValue
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 
 
 @pytest.mark.unit
-class TestU2TimeSeriesPredictionDataset:
-    """Tests for U2TimeSeriesPredictionDataset class."""
+class TestU2TimeSeriesForecastingDataset:
+    """Tests for U2TimeSeriesForecastingDataset class."""
 
     @pytest.mark.parametrize(
         ("json_fixture", "expectation"),
@@ -47,7 +47,7 @@ class TestU2TimeSeriesPredictionDataset:
 
         with expectation:
             data = load_training_input_from_json(json_path)
-            dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+            dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
             assert dataset.df is not None
             assert TIME_SERIES_TIMESTAMP_COLUMN_NAME in dataset.df.columns
@@ -86,14 +86,14 @@ class TestU2TimeSeriesPredictionDataset:
 
         with expectation:
             data = load_training_input_from_json(json_path)
-            dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+            dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
             dataset.drop_short_timeseries(min_timeseries_length)
 
     @pytest.mark.parametrize(("horizon"), [1, 24, 72])
     def test_extend_by_horizon(self, json_single_timeseries: str, horizon: int) -> None:
         """Test extending dataset by horizon."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         pre_len = dataset.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME).size()
 
@@ -107,7 +107,7 @@ class TestU2TimeSeriesPredictionDataset:
     def test_split_past_and_future(self, json_single_timeseries: str, horizon: int) -> None:
         """Test splitting past and future dataframes."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         pre_len = dataset.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME).size()
 
@@ -132,7 +132,7 @@ class TestU2TimeSeriesPredictionDataset:
     def test_add_temporal(self, json_single_timeseries: str) -> None:
         """Test that temporal features are added and recorded."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         dataset.add_temporal()
 
@@ -144,7 +144,7 @@ class TestU2TimeSeriesPredictionDataset:
     def test_add_lags(self, json_single_timeseries: str, lags: list[int], windows: list[int]) -> None:
         """Test that lag and rolling features are added and rows trimmed accordingly."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
         stats = ["mean", "std", "max", "min"]
 
         max_shift = max(lags + windows)
@@ -210,14 +210,14 @@ class TestU2TimeSeriesPredictionDataset:
         data = load_training_input_from_json(json_single_timeseries)
         data.features = ["lag"]
         data.num_weekly_lags = num_weekly_lags
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
         with expectation:
             dataset.drop_short_timeseries(num_weekly_lags * 7 * 24 + min_lookback)
 
     def test_add_holidays_monkeypatched(self, json_single_timeseries: str, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test add_holidays using monkeypatched holidays merger to avoid external calls."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         def fake_merge_holidays(df: pd.DataFrame, location_col: str, datetime_col: str):
             df2 = df.copy()
@@ -235,7 +235,7 @@ class TestU2TimeSeriesPredictionDataset:
     def test_add_weather_monkeypatched(self, json_single_timeseries: str, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test add_weather using monkeypatched weather enricher to avoid external calls."""
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         def fake_enrich_weather(
             df: pd.DataFrame,
@@ -261,7 +261,7 @@ class TestU2TimeSeriesPredictionDataset:
 
     def test_location_dependent_features_require_location(self, json_without_location: str):
         data = load_training_input_from_json(json_without_location)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         with pytest.raises(
             AttributeError,
@@ -305,7 +305,7 @@ class TestU2TimeSeriesPredictionDataset:
             ],
         }
         data = ForecastTrainingInput(**payload)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         assert "temperature" in dataset.df.columns
         assert len(dataset.df) == len(dates)
@@ -333,7 +333,7 @@ class TestU2TimeSeriesPredictionDataset:
         data = ForecastTrainingInput(**payload)
 
         with pytest.raises(ValueError, match="does not match expected frequency"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
     def test_from_forecast_input_basic(self):
         """from_forecast_input should build a valid dataset and extend by horizon."""
@@ -351,7 +351,7 @@ class TestU2TimeSeriesPredictionDataset:
                 "historical_values": [{"time": ts.isoformat(), "value": float(i)} for i, ts in enumerate(dates)],
             },
         )
-        dataset = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         assert dataset.df is not None
         assert dataset.final_timestamp is not None
@@ -376,7 +376,7 @@ class TestU2TimeSeriesPredictionDataset:
         )
 
         with pytest.raises(ValueError, match="does not match expected frequency"):
-            U2TimeSeriesPredictionDataset.from_forecast_input(data)
+            U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
     def test_from_forecast_input_with_nan_values(self):
         """NaN values in forecast input should raise ValidationError at the Pydantic layer."""
@@ -429,7 +429,7 @@ class TestU2TimeSeriesPredictionDataset:
                 }
             ],
         )
-        dataset = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         assert "temperature" in dataset.df.columns
         assert len(dataset.df) == 200 + 24
@@ -451,7 +451,7 @@ class TestU2TimeSeriesPredictionDataset:
             },
             location={"latitude": 48.7758, "longitude": 9.1829},
         )
-        dataset = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         assert dataset.latlon == (48.7758, 9.1829)
 
@@ -488,7 +488,7 @@ class TestU2TimeSeriesPredictionDataset:
         data = ForecastTrainingInput(**payload)
 
         with pytest.raises(ValueError, match="The input data contains NaN values"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
     def test_timestamps_sorted_per_group_after_exogenous_merge(self):
         """Timestamps must be monotonically increasing within each group after exogenous merge."""
@@ -520,7 +520,7 @@ class TestU2TimeSeriesPredictionDataset:
             ],
         }
         data = ForecastTrainingInput(**payload)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         for _, group_df in dataset.df.groupby(TIME_SERIES_GROUP_COLUMN_NAME):
             timestamps = group_df[TIME_SERIES_TIMESTAMP_COLUMN_NAME].reset_index(drop=True)
@@ -558,7 +558,7 @@ class TestU2TimeSeriesPredictionDataset:
         monkeypatch.setattr(pd, "merge", lambda *args, **kwargs: pd.DataFrame())
 
         with pytest.raises(ValueError, match="The input data is empty"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
     def test_from_forecast_input_nan_after_construction(self):
         """NaN in DataFrame after construction should raise ValueError in from_forecast_input."""
@@ -580,7 +580,7 @@ class TestU2TimeSeriesPredictionDataset:
         data.target_series.historical_values[5] = TimeValue(time=dates[5], value=float("nan"))
 
         with pytest.raises(ValueError, match="The input data contains NaN values"):
-            U2TimeSeriesPredictionDataset.from_forecast_input(data)
+            U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
     @pytest.mark.parametrize(
         ("n_rows", "threshold", "expectation"),
@@ -607,7 +607,7 @@ class TestU2TimeSeriesPredictionDataset:
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        dataset = U2TimeSeriesPredictionDataset.from_dataframe(df)
+        dataset = U2TimeSeriesForecastingDataset.from_dataframe(df)
 
         with expectation:
             dataset.drop_short_timeseries(threshold)
@@ -646,7 +646,7 @@ class TestU2TimeSeriesPredictionDataset:
         monkeypatch.setattr("u2demo_time_series_forecasting.dataset.pd.merge", patched_merge)
 
         with pytest.raises(ValueError, match="The input data is empty"):
-            U2TimeSeriesPredictionDataset.from_forecast_input(data)
+            U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
 
 @pytest.mark.unit
@@ -686,7 +686,7 @@ class TestExogenousSeriesMerge:
             ],
         }
         data = ForecastTrainingInput(**payload)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         assert "temperature" in dataset.df.columns
         assert "humidity" in dataset.df.columns
@@ -720,7 +720,7 @@ class TestExogenousSeriesMerge:
                 }
             ],
         )
-        dataset = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         # The last 24 rows (horizon) should have the future exogenous values
         last_24_temps = dataset.df["temperature"].tail(24)
@@ -750,7 +750,7 @@ class TestExogenousSeriesMerge:
                 }
             ],
         )
-        dataset = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         # The last 24 rows (horizon) won't have exogenous data -> NaN after left merge
         last_24_temps = dataset.df["temperature"].tail(24)
@@ -788,7 +788,7 @@ class TestExogenousSeriesMerge:
         data = ForecastTrainingInput(**payload)
 
         with pytest.raises(ValueError, match="The input data contains NaN values"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
     def test_training_exogenous_values_are_correct(self):
         """Exogenous values should be correctly aligned with target timestamps."""
@@ -820,7 +820,7 @@ class TestExogenousSeriesMerge:
             ],
         }
         data = ForecastTrainingInput(**payload)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         # First row should have temperature = 100.0, second = 101.0, etc.
         assert dataset.df["temperature"].iloc[0] == 100.0
@@ -888,14 +888,14 @@ def _make_ds_forecast_input(periods=200, freq="h", horizon_hours=24, values=None
 
 
 @pytest.mark.unit
-class TestPredictionTimestampCorrectness:
+class TestForecastTimestampCorrectness:
     """Verify predicted timestamps are correctly positioned and spaced."""
 
     def test_first_predicted_timestamp_is_one_step_after_last_historical(self):
         """After extend + split, the first future timestamp must be last_historical + freq."""
         dates = pd.date_range(start="2023-01-01", periods=200, freq="h")
         data = _make_ds_forecast_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         last_historical = dates[-1]
         horizon = 24
@@ -908,7 +908,7 @@ class TestPredictionTimestampCorrectness:
     def test_predicted_timestamps_are_evenly_spaced(self):
         """Future timestamps must be evenly spaced at the dataset frequency."""
         data = _make_ds_forecast_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         horizon = 24
         ds.split_past_and_future_dfs(horizon)
@@ -923,7 +923,7 @@ class TestPredictionTimestampCorrectness:
         rng = np.random.default_rng(42)
         values = rng.random(100).tolist()
         data = _make_ds_forecast_input(periods=100, freq="D", values=values, horizon_hours=24)
-        ds = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         horizon = 1  # 24h / 1440min = 1 daily step
         ds.split_past_and_future_dfs(horizon)
@@ -935,7 +935,7 @@ class TestPredictionTimestampCorrectness:
     def test_future_df_has_exactly_horizon_rows(self):
         """future_df must have exactly `horizon` rows per group."""
         data = _make_ds_forecast_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_forecast_input(data)
 
         horizon = 24
         ds.split_past_and_future_dfs(horizon)
@@ -954,13 +954,13 @@ class TestFeatureSymmetry:
         periods = 200
         values = rng.random(periods).tolist()
 
-        train_ds = U2TimeSeriesPredictionDataset.from_training_input(
+        train_ds = U2TimeSeriesForecastingDataset.from_training_input(
             _make_ds_training_input(periods=periods, values=values)
         )
         train_ds.add_temporal()
         train_cols = sorted(train_ds.added_columns["temporal"])
 
-        predict_ds = U2TimeSeriesPredictionDataset.from_forecast_input(
+        predict_ds = U2TimeSeriesForecastingDataset.from_forecast_input(
             _make_ds_forecast_input(periods=periods, values=values)
         )
         predict_ds.add_temporal()
@@ -977,13 +977,13 @@ class TestFeatureSymmetry:
         lags = [168]
         windows = [168]
 
-        train_ds = U2TimeSeriesPredictionDataset.from_training_input(
+        train_ds = U2TimeSeriesForecastingDataset.from_training_input(
             _make_ds_training_input(periods=periods, values=values)
         )
         train_ds.add_lags(lags, windows)
         train_cols = sorted(train_ds.added_columns["lag"])
 
-        predict_ds = U2TimeSeriesPredictionDataset.from_forecast_input(
+        predict_ds = U2TimeSeriesForecastingDataset.from_forecast_input(
             _make_ds_forecast_input(periods=periods, values=values)
         )
         predict_ds.add_lags(lags, windows)
@@ -1001,7 +1001,7 @@ class TestFeatureSymmetry:
         lags = [24]
         windows = [24]
 
-        train_ds = U2TimeSeriesPredictionDataset.from_training_input(
+        train_ds = U2TimeSeriesForecastingDataset.from_training_input(
             _make_ds_training_input(periods=periods, values=values)
         )
         train_ds.add_temporal()
@@ -1010,7 +1010,7 @@ class TestFeatureSymmetry:
         for cols in train_ds.added_columns.values():
             train_all.update(cols)
 
-        predict_ds = U2TimeSeriesPredictionDataset.from_forecast_input(
+        predict_ds = U2TimeSeriesForecastingDataset.from_forecast_input(
             _make_ds_forecast_input(periods=periods, values=values)
         )
         predict_ds.add_temporal()
@@ -1035,7 +1035,7 @@ class TestSplitPastAndFutureDfs:
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        return U2TimeSeriesPredictionDataset.from_dataframe(df)
+        return U2TimeSeriesForecastingDataset.from_dataframe(df)
 
     def test_horizon_of_one(self):
         """Splitting with horizon=1 should extract exactly one row per group."""
@@ -1084,7 +1084,7 @@ class TestSplitPastAndFutureDfs:
                     }
                 )
             )
-        ds = U2TimeSeriesPredictionDataset.from_dataframe(pd.concat(frames, ignore_index=True))
+        ds = U2TimeSeriesForecastingDataset.from_dataframe(pd.concat(frames, ignore_index=True))
 
         ds.split_past_and_future_dfs(10)
 
@@ -1111,7 +1111,7 @@ class TestFeatureIdempotency:
     def test_add_temporal_twice_does_not_duplicate_columns(self):
         """Calling add_temporal() twice should not create extra columns in the DataFrame."""
         data = _make_ds_training_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_training_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         ds.add_temporal()
         first_col_count = len(ds.df.columns)
@@ -1123,7 +1123,7 @@ class TestFeatureIdempotency:
     def test_add_lags_twice_does_not_duplicate_columns(self):
         """Calling add_lags() twice with same params should not duplicate lag columns."""
         data = _make_ds_training_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_training_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         ds.add_lags([24], [24])
 
@@ -1138,7 +1138,7 @@ class TestFeatureIdempotency:
     def test_add_temporal_then_lags_preserves_temporal(self):
         """Adding lags after temporal should not remove temporal columns."""
         data = _make_ds_training_input(periods=200)
-        ds = U2TimeSeriesPredictionDataset.from_training_input(data)
+        ds = U2TimeSeriesForecastingDataset.from_training_input(data)
 
         ds.add_temporal()
         temporal_cols = set(ds.added_columns["temporal"])
@@ -1173,7 +1173,7 @@ class TestTimeGapsDataset:
         # The gap deliberately breaks pd.infer_freq, so build the dataset by
         # passing freq metadata explicitly to test that extend_by_horizon uses
         # the stored freq_timedelta rather than the spacing of the last rows.
-        ds = U2TimeSeriesPredictionDataset(
+        ds = U2TimeSeriesForecastingDataset(
             df=df,
             freq="h",
             freq_minutes=60,
@@ -1216,7 +1216,7 @@ class TestDatasetEdgeCases:
             },
         )
 
-        ts = U2TimeSeriesPredictionDataset.from_forecast_input(data)
+        ts = U2TimeSeriesForecastingDataset.from_forecast_input(data)
         horizon_steps = max(1, data.time_parameters.horizon_hours * 60 // ts.freq_minutes)
 
         assert horizon_steps >= 1
@@ -1247,7 +1247,7 @@ class TestDatasetEdgeCases:
         )
 
         with pytest.raises(ValueError, match="(?i)frequency|irregular|spacing"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
     def test_split_past_future_with_horizon_zero_preserves_data(self):
         """split_past_and_future_dfs(0) should keep all rows in df and
@@ -1264,7 +1264,7 @@ class TestDatasetEdgeCases:
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        ds = U2TimeSeriesPredictionDataset.from_dataframe(df)
+        ds = U2TimeSeriesForecastingDataset.from_dataframe(df)
 
         ds.split_past_and_future_dfs(0)
 
@@ -1312,12 +1312,12 @@ class TestDatasetEdgeCases:
         )
 
         with pytest.raises(ValueError, match="(?i)duplicate"):
-            U2TimeSeriesPredictionDataset.from_training_input(data)
+            U2TimeSeriesForecastingDataset.from_training_input(data)
 
 
 @pytest.mark.unit
-class TestMultiGroupPrediction:
-    """Test prediction pipeline behavior with multi-group data."""
+class TestMultiGroupForecasting:
+    """Test forecasting pipeline behavior with multi-group data."""
 
     def _make_multi_group_dataset(self, group_sizes):
         """Build a dataset with multiple groups of different lengths."""
@@ -1333,7 +1333,7 @@ class TestMultiGroupPrediction:
                 }
             )
             frames.append(df)
-        return U2TimeSeriesPredictionDataset.from_dataframe(pd.concat(frames, ignore_index=True))
+        return U2TimeSeriesForecastingDataset.from_dataframe(pd.concat(frames, ignore_index=True))
 
     def test_extend_by_horizon_adds_rows_per_group(self):
         """Each group should get exactly `horizon` new rows."""
@@ -1377,7 +1377,7 @@ class TestMultiGroupPrediction:
 class TestMissingLatlonGuards:
     """Feature methods that depend on ``self.latlon`` should raise eagerly when it is missing."""
 
-    def _make_dataset(self) -> U2TimeSeriesPredictionDataset:
+    def _make_dataset(self) -> U2TimeSeriesForecastingDataset:
         df = pd.DataFrame(
             {
                 TIME_SERIES_TIMESTAMP_COLUMN_NAME: pd.date_range("2023-01-01", periods=3, freq="h"),
@@ -1385,7 +1385,7 @@ class TestMissingLatlonGuards:
                 TIME_SERIES_GROUP_COLUMN_NAME: 0,
             }
         )
-        return U2TimeSeriesPredictionDataset.from_dataframe(df)
+        return U2TimeSeriesForecastingDataset.from_dataframe(df)
 
     def test_add_holidays_without_latlon_raises(self):
         ds = self._make_dataset()

@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 
 
 def apply_features(
-    time_series: U2TimeSeriesPredictionDataset,
+    time_series: U2TimeSeriesForecastingDataset,
     features: Sequence[FeatureName | str],
     *,
     lags: Sequence[int] | None = None,

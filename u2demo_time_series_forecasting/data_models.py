@@ -21,7 +21,7 @@ class ForecastedTimeValue(TimeValue):
 
     quantiles: dict[QuantileKey, float] | None = Field(
         default=None,
-        description="Quantile predictions at this timestep. Keys are quantile levels (0-1), values are the predicted value at that quantile.",
+        description="Quantile forecasts at this timestep. Keys are quantile levels (0-1), values are the forecasted value at that quantile.",
     )
 
 

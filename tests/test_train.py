@@ -67,7 +67,7 @@ def _make_training_input(
 class TestTrainOrchestration:
     """Tests for train function orchestration logic."""
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_creates_dataset_from_input(self, mock_model_cls):
         """Train should create a dataset from the input and call model.train."""
         mock_model = MagicMock()
@@ -81,7 +81,7 @@ class TestTrainOrchestration:
         mock_model.new.assert_called_once()
         mock_model.train.assert_called_once()
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_temporal_feature_applied(self, mock_model_cls):
         """When 'temporal' is in features, add_temporal should be called on dataset."""
         mock_model = MagicMock()
@@ -98,8 +98,8 @@ class TestTrainOrchestration:
         with pytest.raises(ValueError, match="nonexistent_feature"):
             _make_training_input(periods=200, features=["nonexistent_feature"])
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionDataset")
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingDataset")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_raises_when_freq_minutes_not_initialized(self, mock_model_cls, mock_dataset_cls):
         """train should raise when dataset exposes freq_minutes=None / freq=None."""
         mock_dataset = MagicMock()
@@ -112,7 +112,7 @@ class TestTrainOrchestration:
         with pytest.raises(RuntimeError, match="Frequency is not initialized"):
             train(data)
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_deterministic_sets_quantile_half(self, mock_model_cls):
         """Deterministic forecast should use quantile_levels=[0.5]."""
         mock_model = MagicMock()
@@ -125,7 +125,7 @@ class TestTrainOrchestration:
         call_kwargs = mock_model.new.call_args
         assert call_kwargs.kwargs.get("quantile_levels") == [0.5] or call_kwargs[1].get("quantile_levels") == [0.5]
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_stochastic_uses_config_quantiles(self, mock_model_cls):
         """Stochastic forecast with quantile_levels should pass them through."""
         mock_model = MagicMock()
@@ -141,7 +141,7 @@ class TestTrainOrchestration:
         levels = call_kwargs.kwargs.get("quantile_levels") or call_kwargs[1].get("quantile_levels")
         assert levels == [0.1, 0.5, 0.9]
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_eval_metric_from_config(self, mock_model_cls):
         """Custom eval_metric from config should be uppercased and passed."""
         mock_model = MagicMock()
@@ -155,7 +155,7 @@ class TestTrainOrchestration:
         metric = call_kwargs.kwargs.get("eval_metric") or call_kwargs[1].get("eval_metric")
         assert metric == "RMSE"
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_default_eval_metric(self, mock_model_cls):
         """Without eval_metric in config, should use DEFAULT_TRAIN_EVAL_METRIC."""
         mock_model = MagicMock()
@@ -169,7 +169,7 @@ class TestTrainOrchestration:
         metric = call_kwargs.kwargs.get("eval_metric") or call_kwargs[1].get("eval_metric")
         assert metric == "WQL"
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_model_path_includes_id_and_version(self, mock_model_cls):
         """Model path should include model_id and model_version."""
         mock_model = MagicMock()
@@ -183,7 +183,7 @@ class TestTrainOrchestration:
         assert "test-model" in path_arg
         assert "1.0.0" in path_arg
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_short_timeseries_raises(self, mock_model_cls):
         """Very short time series should fail validation against min_timeseries_length."""
         data = _make_training_input(periods=5, features=[], lookback_steps=1000)
@@ -191,7 +191,7 @@ class TestTrainOrchestration:
         with pytest.raises(ValueError, match="No timeseries"):
             train(data)
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_default_lookback_is_1024(self, mock_model_cls):
         """Without lookback_steps, DEFAULT_TRAIN_MIN_LOOKBACK (1024) is used,
         so 200 periods is too short."""
@@ -200,7 +200,7 @@ class TestTrainOrchestration:
         with pytest.raises(ValueError, match="No timeseries"):
             train(data)
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_lag_feature_computation(self, mock_model_cls):
         """When 'lag' feature is enabled, lags should be computed based on frequency and num_weekly_lags."""
         mock_model = MagicMock()
@@ -214,7 +214,7 @@ class TestTrainOrchestration:
 
         mock_model.train.assert_called_once()
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_holiday_feature_applied(self, mock_model_cls, monkeypatch):
         """When 'holiday' is in features, add_holidays should be called on dataset."""
         mock_model = MagicMock()
@@ -232,7 +232,7 @@ class TestTrainOrchestration:
 
         mock_model.train.assert_called_once()
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_weather_feature_applied(self, mock_model_cls, monkeypatch):
         """When 'weather' is in features, add_weather should be called on dataset."""
         mock_model = MagicMock()
@@ -249,7 +249,7 @@ class TestTrainOrchestration:
 
         mock_model.train.assert_called_once()
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_excluded_model_types_passed(self, mock_model_cls):
         """excluded_model_types from config should be passed in training_kwargs."""
         mock_model = MagicMock()
@@ -263,7 +263,7 @@ class TestTrainOrchestration:
         training_kwargs = call_kwargs.kwargs.get("training_kwargs") or call_kwargs[1].get("training_kwargs")
         assert training_kwargs["excluded_model_types"] == ["Chronos"]
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_stochastic_no_quantiles_defaults_none(self, mock_model_cls):
         """Stochastic without quantile_levels in config should pass None."""
         mock_model = MagicMock()
@@ -277,7 +277,7 @@ class TestTrainOrchestration:
         levels = call_kwargs.kwargs.get("quantile_levels") or call_kwargs[1].get("quantile_levels")
         assert levels is None
 
-    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesPredictionModel")
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
     def test_lag_feature_without_num_weekly_lags_should_not_crash(self, mock_model_cls):
         """When features includes 'lag' but num_weekly_lags is not set (defaults to 0),
         the lag list is empty. train() should handle this gracefully instead of crashing

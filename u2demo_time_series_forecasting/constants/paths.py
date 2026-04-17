@@ -5,5 +5,5 @@ CACHE_DIR = BASEDIR / ".cache"
 MODEL_DIR = BASEDIR / "models"
 OUTPUT_DIR = BASEDIR / "output"
 
-METADATA_FILENAME = "u2/metadata.json"
-LEADERBOARD_FILENAME = "u2/training_result_leaderboard.csv"
+METADATA_FILENAME = "u2demo/metadata.json"
+LEADERBOARD_FILENAME = "u2demo/training_result_leaderboard.csv"

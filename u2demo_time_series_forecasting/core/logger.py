@@ -2,7 +2,7 @@ import logging
 
 from u2demo_time_series_forecasting.constants.envs import settings
 
-logger = logging.getLogger("u2")
+logger = logging.getLogger("u2demo")
 logger.setLevel(settings.log_level)
 
 _handler = logging.StreamHandler()

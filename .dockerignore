@@ -1,6 +1,7 @@
-# Ignore everything by default...
+# Ignore everything by default, then allow only what the image actually needs.
 *
-
-# ...then allow only what the image actually needs.
 !u2demo_time_series_forecasting/
+# pyproject.toml is required by `pip install -e .`, and pyproject references README.
+!pyproject.toml
+!README.md
 !requirements.txt

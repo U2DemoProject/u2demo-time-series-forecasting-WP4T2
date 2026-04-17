@@ -149,9 +149,9 @@ def _extract_latlon(data: ForecastInput | ForecastTrainingInput) -> tuple[float,
     return (data.location.latitude, data.location.longitude) if data.location else None
 
 
-class U2TimeSeriesPredictionDataset:
+class U2TimeSeriesForecastingDataset:
     """
-    Container and feature-engineering pipeline for U2 time-series forecasting models.
+    Container and feature-engineering pipeline for U2Demo time-series forecasting models.
 
     A dataset always wraps a non-empty DataFrame and the frequency metadata derived
     from its timestamp column. Construct one via ``from_training_input``,
@@ -296,7 +296,7 @@ class U2TimeSeriesPredictionDataset:
 
     def drop_short_timeseries(self, min_timeseries_length: int) -> None:
         """
-        Drop time-series groups that don't have enough rows for prediction or training.
+        Drop time-series groups that don't have enough rows for forecasting or training.
 
         Parameters
         ----------

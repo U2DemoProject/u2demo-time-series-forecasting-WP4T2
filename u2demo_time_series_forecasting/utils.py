@@ -100,7 +100,7 @@ def get_known_covariates(time_series_added_columns: dict[str, list[str]], horizo
     Given a mapping of feature categories to lists of added column names (as
     produced by the dataset feature engineering pipeline), this function filters
     out plain lag features whose lag value is smaller than the forecast horizon,
-    since those lags depend on unknown future target values at prediction time.
+    since those lags depend on unknown future target values at forecast time.
 
     Parameters
     ----------

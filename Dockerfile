@@ -1,18 +1,22 @@
 FROM python:3.12-slim
 
-# Non-root user so files written to bind-mounted volumes (models/, output/, .cache/)
-# don't land on the host as root. Callers can override at runtime with
-# `--user "$(id -u):$(id -g)"` so files end up owned by the host user directly.
-RUN groupadd --gid 1000 appuser \
-    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash appuser
 
 WORKDIR /app
 
+# Install deps first — this layer is cached across source-only changes.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=appuser:appuser . .
+# Editable install so BASEDIR resolves to /app (not site-packages).
+COPY  . .
 
-USER appuser
+RUN pip install --no-cache-dir --no-deps -e .
 
-ENTRYPOINT ["u2"]
+# Create writable dirs for runtime artifacts and seed their permissions.
+# mkdir must run before chmod so these dirs exist at the right permission level;
+# named Docker volumes are initialised from the image content, so /app/.cache
+# must already be 777 here or the volume mount will be root-owned.
+RUN mkdir -p /app/.cache /app/models /app/output && chmod -R 777 /app
+
+
+ENTRYPOINT ["u2demo-forecast"]

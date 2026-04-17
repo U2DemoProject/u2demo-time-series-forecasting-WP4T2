@@ -1,6 +1,6 @@
 """Tests for u2demo_time_series_forecasting.model module.
 
-Covers the full lifecycle of U2TimeSeriesPredictionModel: initialization, save/load round-trips, prediction output format, and guard-rails (predict before load). Uses real AutoGluon training on small fixtures to exercise integration paths.
+Covers the full lifecycle of U2TimeSeriesForecastingModel: initialization, save/load round-trips, forecast output format, and guard-rails (predict before load). Uses real AutoGluon training on small fixtures to exercise integration paths.
 """
 
 import json
@@ -18,10 +18,10 @@ from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_GROUP_C
 from u2demo_time_series_forecasting.constants.paths import (
     LEADERBOARD_FILENAME as MODEL_TRAINING_RESULT_LEADERBOARD_PATH,
 )
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
-from u2demo_time_series_forecasting.model import U2TimeSeriesPredictionModel
+from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
 from u2demo_time_series_forecasting.utils import get_min_timeseries_length
 
 
@@ -50,20 +50,20 @@ def _make_metadata(
 
 
 @pytest.mark.integration
-class TestU2TimeSeriesPredictionModel:
-    """Tests for U2TimeSeriesPredictionModel class."""
+class TestU2TimeSeriesForecastingModel:
+    """Tests for U2TimeSeriesForecastingModel class."""
 
     def test_predict_when_unloaded(self, json_single_timeseries: str):
-        model = U2TimeSeriesPredictionModel("/tmp/nonexistent_path")
+        model = U2TimeSeriesForecastingModel("/tmp/nonexistent_path")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
         with pytest.raises(RuntimeError):
             model.predict(dataset)
 
     def test_new_initializes_predictor(self, temp_dir: str):
         model_path = os.path.join(temp_dir, "init_model")
         horizon = 82
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value", known_covariates_names=["x"], prediction_length=horizon, freq="h", eval_metric="MAE"
         )
@@ -77,16 +77,16 @@ class TestU2TimeSeriesPredictionModel:
 
         model_path = os.path.join(temp_dir, "saved_model")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value", known_covariates_names=[], prediction_length=horizon, freq=freq, eval_metric="WQL"
         )
         training_kwargs = {"enable_ensemble": False, "hyperparameters": {"SeasonalNaive": {}}, "random_seed": 54}
         model.train(dataset, min_lookback=24, num_val_windows=1, num_test_windows=0, training_kwargs=training_kwargs)
 
-        new_model = U2TimeSeriesPredictionModel(model_path)
+        new_model = U2TimeSeriesForecastingModel(model_path)
         new_model.load()
 
         assert new_model.predictor is not None
@@ -102,9 +102,9 @@ class TestU2TimeSeriesPredictionModel:
 
         model_path = os.path.join(temp_dir, "predict_test")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value", known_covariates_names=[], prediction_length=horizon, freq=freq, eval_metric="WQL"
         )
@@ -128,9 +128,9 @@ class TestU2TimeSeriesPredictionModel:
 
         model_path = os.path.join(temp_dir, "predict_load")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value", known_covariates_names=[], prediction_length=horizon, freq=freq, eval_metric="WQL"
         )
@@ -145,7 +145,7 @@ class TestU2TimeSeriesPredictionModel:
 
         predictions = model.predict(dataset, **pred_kwargs)
 
-        new_model = U2TimeSeriesPredictionModel(model_path)
+        new_model = U2TimeSeriesForecastingModel(model_path)
         new_model.load()
 
         new_predictions = new_model.predict(dataset, **pred_kwargs)
@@ -161,14 +161,14 @@ class TestU2TimeSeriesPredictionModel:
 
         model_path = os.path.join(temp_dir, "metadata_rt_model")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
         dataset.add_temporal()
         dataset.add_lags(lags=lags, windows=windows)
 
         # Capture state before training so we can compare after reload
         expected_added_columns = {k: list(v) for k, v in dataset.added_columns.items()}
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value",
             known_covariates_names=[],
@@ -179,7 +179,7 @@ class TestU2TimeSeriesPredictionModel:
         training_kwargs = {"enable_ensemble": False, "hyperparameters": {"SeasonalNaive": {}}, "random_seed": 54}
         model.train(dataset, min_lookback=24, num_val_windows=1, num_test_windows=0, training_kwargs=training_kwargs)
 
-        reloaded = U2TimeSeriesPredictionModel(model_path)
+        reloaded = U2TimeSeriesForecastingModel(model_path)
         reloaded.load()
 
         assert reloaded.metadata.added_columns == expected_added_columns
@@ -188,15 +188,15 @@ class TestU2TimeSeriesPredictionModel:
 
 
 @pytest.mark.unit
-class TestU2TimeSeriesPredictionModelUnit:
-    """Unit tests for U2TimeSeriesPredictionModel using mocks."""
+class TestU2TimeSeriesForecastingModelUnit:
+    """Unit tests for U2TimeSeriesForecastingModel using mocks."""
 
     def test_load_already_loaded(self, caplog):
         """Loading when predictor is already set should log and return early."""
-        model = U2TimeSeriesPredictionModel("/tmp/some_path")
+        model = U2TimeSeriesForecastingModel("/tmp/some_path")
         model.predictor = MagicMock()
 
-        with caplog.at_level(logging.INFO, logger="U2 Time Series Prediction"):
+        with caplog.at_level(logging.INFO, logger="U2Demo Time Series Forecasting"):
             model.load()
 
         assert any("already loaded" in r.message for r in caplog.records)
@@ -206,20 +206,20 @@ class TestU2TimeSeriesPredictionModelUnit:
         horizon = 5
         model_path = str(tmp_path / "persist_fail_model")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(
             target_column="value", known_covariates_names=[], prediction_length=horizon, freq="h", eval_metric="WQL"
         )
         training_kwargs = {"enable_ensemble": False, "hyperparameters": {"SeasonalNaive": {}}, "random_seed": 54}
         model.train(dataset, min_lookback=24, num_val_windows=1, num_test_windows=0, training_kwargs=training_kwargs)
 
-        new_model = U2TimeSeriesPredictionModel(model_path)
+        new_model = U2TimeSeriesForecastingModel(model_path)
 
         with (
             patch.object(TimeSeriesPredictor, "persist", side_effect=RuntimeError("persist error")),
-            caplog.at_level(logging.WARNING, logger="U2 Time Series Prediction"),
+            caplog.at_level(logging.WARNING, logger="U2Demo Time Series Forecasting"),
         ):
             new_model.load()
 
@@ -228,12 +228,12 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_unload_unpersist_failure(self, caplog):
         """unpersist() failure should log a warning but not raise."""
-        model = U2TimeSeriesPredictionModel("/tmp/some_path")
+        model = U2TimeSeriesForecastingModel("/tmp/some_path")
         mock_predictor = MagicMock()
         mock_predictor.unpersist.side_effect = RuntimeError("unpersist error")
         model.predictor = mock_predictor
 
-        with caplog.at_level(logging.WARNING, logger="U2 Time Series Prediction"):
+        with caplog.at_level(logging.WARNING, logger="U2Demo Time Series Forecasting"):
             model.unload()
 
         assert model.predictor is None
@@ -241,7 +241,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_reload_reloads_with_new_path(self):
         """reload should unload, update path, and load again."""
-        model = U2TimeSeriesPredictionModel("/tmp/old_path")
+        model = U2TimeSeriesForecastingModel("/tmp/old_path")
 
         with patch.object(model, "unload") as mock_unload, patch.object(model, "load") as mock_load:
             model.reload(new_path="/tmp/new_path")
@@ -252,7 +252,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_reload_without_new_path(self):
         """reload without new_path should keep existing path."""
-        model = U2TimeSeriesPredictionModel("/tmp/old_path")
+        model = U2TimeSeriesForecastingModel("/tmp/old_path")
 
         with patch.object(model, "unload") as mock_unload, patch.object(model, "load") as mock_load:
             model.reload()
@@ -263,7 +263,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_train_frequency_mismatch_warning(self, caplog):
         """Frequency mismatch between dataset and model should log a warning."""
-        model = U2TimeSeriesPredictionModel("/tmp/freq_warn")
+        model = U2TimeSeriesForecastingModel("/tmp/freq_warn")
         mock_predictor = MagicMock()
         mock_predictor.freq = "D"
         mock_predictor.prediction_length = 5
@@ -278,7 +278,7 @@ class TestU2TimeSeriesPredictionModelUnit:
         dataset.added_columns = {}
 
         with (
-            caplog.at_level(logging.WARNING, logger="U2 Time Series Prediction"),
+            caplog.at_level(logging.WARNING, logger="U2Demo Time Series Forecasting"),
             patch.object(model, "_save_metadata"),
         ):
             model.train(dataset, min_lookback=24, num_val_windows=1, num_test_windows=0)
@@ -288,7 +288,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_metadata_with_lag_columns(self, tmp_path):
         """_save_metadata should extract lags and windows from added_columns when lag features are present."""
         model_path = str(tmp_path / "metadata_lag_model")
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.predictor = MagicMock()
         model.predictor.freq = "h"
         model.predictor.prediction_length = 24
@@ -315,7 +315,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_metadata_without_lag_columns(self, tmp_path):
         """_save_metadata without lag features should set lags=[0] and compute min_timeseries_length accordingly."""
         model_path = str(tmp_path / "metadata_no_lag_model")
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.predictor = MagicMock()
         model.predictor.freq = "h"
         model.predictor.prediction_length = 24
@@ -338,7 +338,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_metadata_single_lag(self, tmp_path):
         """_save_metadata with a single lag should extract it correctly."""
         model_path = str(tmp_path / "metadata_single_lag")
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.predictor = MagicMock()
         model.predictor.freq = "D"
         model.predictor.prediction_length = 7
@@ -364,7 +364,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_metadata_writes_json_file(self, tmp_path):
         """_save_metadata should write a JSON file to the model directory."""
         model_path = str(tmp_path / "metadata_file_model")
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.predictor = MagicMock()
         model.predictor.freq = "h"
         model.predictor.prediction_length = 24
@@ -381,7 +381,7 @@ class TestU2TimeSeriesPredictionModelUnit:
             training_kwargs={},
         )
 
-        metadata_path = os.path.join(model_path, "u2", "metadata.json")
+        metadata_path = os.path.join(model_path, "u2demo", "metadata.json")
         assert os.path.exists(metadata_path)
         with open(metadata_path) as f:
             loaded = json.load(f)
@@ -390,7 +390,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_predict_when_unloaded_raises(self):
         """predict should raise RuntimeError when predictor is None."""
-        model = U2TimeSeriesPredictionModel("/tmp/unloaded")
+        model = U2TimeSeriesForecastingModel("/tmp/unloaded")
         dataset = MagicMock()
 
         with pytest.raises(RuntimeError, match="Predictor is not loaded"):
@@ -398,7 +398,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_predict_success_path(self):
         """predict on a loaded model should call predictor.predict with correct args."""
-        model = U2TimeSeriesPredictionModel("/tmp/pred_success")
+        model = U2TimeSeriesForecastingModel("/tmp/pred_success")
         mock_predictor = MagicMock()
         mock_predictor.predict.return_value = pd.DataFrame({"mean": [1.0]})
         model.predictor = mock_predictor
@@ -418,7 +418,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_predict_without_future_df(self):
         """predict should handle future_df=None by passing None as known_covariates."""
-        model = U2TimeSeriesPredictionModel("/tmp/pred_no_future")
+        model = U2TimeSeriesForecastingModel("/tmp/pred_no_future")
         mock_predictor = MagicMock()
         mock_predictor.predict.return_value = pd.DataFrame({"mean": [1.0]})
         model.predictor = mock_predictor
@@ -438,9 +438,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_leaderboards_computes_average(self, tmp_path):
         """_save_leaderboards should average metrics across cutoff windows and save CSV."""
         model_path = str(tmp_path / "lb_avg_model")
-        os.makedirs(os.path.join(model_path, "u2"), exist_ok=True)
-
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         mock_predictor = MagicMock()
         mock_predictor.prediction_length = 5
         model.predictor = mock_predictor
@@ -471,9 +469,7 @@ class TestU2TimeSeriesPredictionModelUnit:
     def test_save_leaderboards_sorted_by_score(self, tmp_path):
         """Leaderboard should be sorted by score_test descending."""
         model_path = str(tmp_path / "lb_sort_model")
-        os.makedirs(os.path.join(model_path, "u2"), exist_ok=True)
-
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         mock_predictor = MagicMock()
         mock_predictor.prediction_length = 5
         model.predictor = mock_predictor
@@ -500,7 +496,7 @@ class TestU2TimeSeriesPredictionModelUnit:
         validation.
 
         During training, min_timeseries_length = max(lags) + min_lookback + horizon.
-        The metadata should store the same value so that prediction-time
+        The metadata should store the same value so that forecast-time
         drop_short_timeseries uses the same threshold.
         """
         lags = [168]
@@ -516,9 +512,9 @@ class TestU2TimeSeriesPredictionModelUnit:
         """Training with save_leaderboards=True should produce a leaderboard CSV."""
         model_path = str(tmp_path / "lb_model")
         data = load_training_input_from_json(json_single_timeseries)
-        dataset = U2TimeSeriesPredictionDataset.from_training_input(data)
+        dataset = U2TimeSeriesForecastingDataset.from_training_input(data)
 
-        model = U2TimeSeriesPredictionModel(model_path)
+        model = U2TimeSeriesForecastingModel(model_path)
         model.new(target_column="value", known_covariates_names=[], prediction_length=5, freq="h", eval_metric="WQL")
         training_kwargs = {"enable_ensemble": False, "hyperparameters": {"SeasonalNaive": {}}, "random_seed": 54}
         model.train(
@@ -534,35 +530,35 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_freq_property_returns_metadata_frequency(self):
         """`freq` should read from ModelMetadata.frequency."""
-        model = U2TimeSeriesPredictionModel("/tmp/freq_prop")
+        model = U2TimeSeriesForecastingModel("/tmp/freq_prop")
         model.metadata = _make_metadata(frequency="D")
 
         assert model.freq == "D"
 
     def test_freq_property_raises_without_metadata(self):
         """`freq` should raise when metadata is not loaded."""
-        model = U2TimeSeriesPredictionModel("/tmp/freq_no_meta")
+        model = U2TimeSeriesForecastingModel("/tmp/freq_no_meta")
 
         with pytest.raises(RuntimeError, match="Model metadata is not loaded"):
             _ = model.freq
 
     def test_prediction_length_property_returns_metadata_horizon(self):
         """`prediction_length` should read from ModelMetadata.horizon."""
-        model = U2TimeSeriesPredictionModel("/tmp/pred_len_prop")
+        model = U2TimeSeriesForecastingModel("/tmp/pred_len_prop")
         model.metadata = _make_metadata(horizon=42)
 
         assert model.prediction_length == 42
 
     def test_prediction_length_property_raises_without_metadata(self):
         """`prediction_length` should raise when metadata is not loaded."""
-        model = U2TimeSeriesPredictionModel("/tmp/pred_len_no_meta")
+        model = U2TimeSeriesForecastingModel("/tmp/pred_len_no_meta")
 
         with pytest.raises(RuntimeError, match="Model metadata is not loaded"):
             _ = model.prediction_length
 
     def test_quantile_levels_property_returns_predictor_quantile_levels(self):
         """`quantile_levels` should read from the loaded predictor."""
-        model = U2TimeSeriesPredictionModel("/tmp/qlevels")
+        model = U2TimeSeriesForecastingModel("/tmp/qlevels")
         mock_predictor = MagicMock()
         mock_predictor.quantile_levels = [0.1, 0.5, 0.9]
         model.predictor = mock_predictor
@@ -571,14 +567,14 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_quantile_levels_property_raises_without_predictor(self):
         """`quantile_levels` should raise when predictor is not loaded."""
-        model = U2TimeSeriesPredictionModel("/tmp/qlevels_none")
+        model = U2TimeSeriesForecastingModel("/tmp/qlevels_none")
 
         with pytest.raises(RuntimeError, match="Predictor is not loaded"):
             _ = model.quantile_levels
 
     def test_save_metadata_raises_without_predictor(self, tmp_path):
         """_save_metadata without a predictor should raise."""
-        model = U2TimeSeriesPredictionModel(str(tmp_path / "no_predictor"))
+        model = U2TimeSeriesForecastingModel(str(tmp_path / "no_predictor"))
         dataset = MagicMock()
 
         with pytest.raises(RuntimeError, match="Predictor is not loaded"):
@@ -593,7 +589,7 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_save_metadata_raises_when_predictor_freq_none(self, tmp_path):
         """_save_metadata should raise when the predictor reports no frequency."""
-        model = U2TimeSeriesPredictionModel(str(tmp_path / "no_freq"))
+        model = U2TimeSeriesForecastingModel(str(tmp_path / "no_freq"))
         model.predictor = MagicMock()
         model.predictor.freq = None
 
@@ -609,14 +605,14 @@ class TestU2TimeSeriesPredictionModelUnit:
 
     def test_save_leaderboards_raises_without_predictor(self, tmp_path):
         """_save_leaderboards without a predictor should raise."""
-        model = U2TimeSeriesPredictionModel(str(tmp_path / "lb_no_predictor"))
+        model = U2TimeSeriesForecastingModel(str(tmp_path / "lb_no_predictor"))
 
         with pytest.raises(RuntimeError, match="Predictor is not loaded"):
             model._save_leaderboards(num_test_windows=1, test_data=MagicMock())
 
     def test_train_raises_without_predictor(self):
         """train without a predictor should raise."""
-        model = U2TimeSeriesPredictionModel("/tmp/train_no_predictor")
+        model = U2TimeSeriesForecastingModel("/tmp/train_no_predictor")
         dataset = MagicMock()
         dataset.df = pd.DataFrame({"time": [1], "value": [1]})
 

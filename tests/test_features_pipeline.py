@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
-from u2demo_time_series_forecasting.dataset import U2TimeSeriesPredictionDataset
+from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 from u2demo_time_series_forecasting.features.pipeline import apply_features
 
@@ -163,7 +163,7 @@ class TestTrainPredictLagSymmetry:
 
     Training derives lag offsets dynamically from ``num_weekly_lags`` and the
     inferred frequency. It then persists the resulting feature columns and the
-    raw lag values in ``ModelMetadata``. Prediction must be able to read those
+    raw lag values in ``ModelMetadata``. Forecasting must be able to read those
     persisted lags back and replay ``apply_features`` to produce the *exact*
     same column names — otherwise the predictor will see covariates it was
     never trained on (or be missing some it expects). This test asserts that
@@ -173,7 +173,7 @@ class TestTrainPredictLagSymmetry:
     def test_lag_columns_round_trip_through_metadata(self):
         # Step 1: build a training dataset and apply the lag pipeline using
         # the same lag derivation that u2demo_time_series_forecasting.train.train() uses for hourly data.
-        train_ds = U2TimeSeriesPredictionDataset.from_training_input(_training_input_with_lag(periods=2000))
+        train_ds = U2TimeSeriesForecastingDataset.from_training_input(_training_input_with_lag(periods=2000))
         hourly_steps_per_week = 168
         num_weekly_lags = 2
         computed_lags = [hourly_steps_per_week * (1 + i) for i in range(num_weekly_lags)]
@@ -194,7 +194,7 @@ class TestTrainPredictLagSymmetry:
 
         # Step 3: build a fresh forecast dataset and replay apply_features
         # using only the persisted metadata, exactly like u2demo_time_series_forecasting.predict.predict().
-        forecast_ds = U2TimeSeriesPredictionDataset.from_forecast_input(_forecast_input_with_lag(periods=2000))
+        forecast_ds = U2TimeSeriesForecastingDataset.from_forecast_input(_forecast_input_with_lag(periods=2000))
         apply_features(forecast_ds, [FeatureName.LAG], lags=persisted_lags, windows=persisted_windows)
         forecast_lag_columns = sorted(forecast_ds.added_columns[FeatureName.LAG])
 
