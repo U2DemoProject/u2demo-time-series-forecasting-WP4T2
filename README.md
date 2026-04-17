@@ -5,7 +5,7 @@
 [![CI](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/actions/workflows/ci.yml/badge.svg)](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/U2DemoProject/f303865e7600632d173a60147aa9abfe/raw/coverage.json)](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/jsantana-eifer/f303865e7600632d173a60147aa9abfe/raw/coverage.json)](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/actions/workflows/ci.yml)
 
 Train and run inference on time-series forecasting models using [AutoGluon](https://auto.gluon.ai/), with automatic feature engineering (temporal, lag, holiday, weather) for hourly or daily data.
 
