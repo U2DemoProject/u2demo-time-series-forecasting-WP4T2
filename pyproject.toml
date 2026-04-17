@@ -1,6 +1,6 @@
 [project]
 name = "u2demo-time-series-forecasting"
-version = "0.1.0"
+version = "0.2.0"
 description = "Time Series Forecasting Algorithm Implementation for U2Demo Project"
 authors = [
     {name = "Isaac Boates",email = "isaac.boates@eifer.org"},
@@ -20,7 +20,7 @@ keywords = [
     "u2demo",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
