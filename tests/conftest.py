@@ -5,6 +5,12 @@ import os
 import tempfile
 from collections.abc import Generator
 
+# CI only: pin HF_HOME to /tmp so model downloads never enter cached paths.
+# Must run at import time, before `transformers` / `huggingface_hub` reads it.
+# Local runs are left alone to keep reusing the dev's shared HF cache.
+if os.environ.get("CI"):
+    os.environ.setdefault("HF_HOME", tempfile.mkdtemp(prefix="u2demo-hf-"))
+
 import numpy as np
 import pandas as pd
 import pytest

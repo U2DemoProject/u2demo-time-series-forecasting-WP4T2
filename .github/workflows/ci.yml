@@ -127,10 +127,27 @@ jobs:
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
 
       - run: poetry install --no-root --with dev
-      # PyPI serves CUDA-enabled torch on Linux (~821 MB + ~1.8 GB of nvidia-* libs).
-      # CI has no GPU, so replace with the CPU-only wheel to shrink the venv cache.
-      - run: poetry run pip install torch --force-reinstall --index-url https://download.pytorch.org/whl/cpu
-      - run: poetry run pytest -m "not e2e and not integration"
+
+      # PyPI's Linux torch/torchvision wheels are CUDA-enabled (~2.6 GB) so local
+      # GPU devs get CUDA by default. CI has no GPU — swap both to the CPU wheels
+      # at the same lockfile versions (keeps autogluon's `torch<2.10` happy, no
+      # version drift). Torchvision must be reinstalled in the same call: its C
+      # extension is built against a specific torch ABI and breaks otherwise.
+      - name: Get torch & torchvision versions from lock file
+        id: torch-versions
+        run: |
+          TORCH=$(grep -A1 '^name = "torch"' poetry.lock | grep version | cut -d'"' -f2)
+          TORCHVISION=$(grep -A1 '^name = "torchvision"' poetry.lock | grep version | cut -d'"' -f2)
+          echo "torch=$TORCH" >> "$GITHUB_OUTPUT"
+          echo "torchvision=$TORCHVISION" >> "$GITHUB_OUTPUT"
+      - run: poetry run pip install "torch==${{ steps.torch-versions.outputs.torch }}+cpu" "torchvision==${{ steps.torch-versions.outputs.torchvision }}+cpu" --force-reinstall --index-url https://download.pytorch.org/whl/cpu
+
+      # Purge orphaned CUDA libs (nvidia-*, triton) left behind by the swap above —
+      # pip has no dep GC, so they'd otherwise bloat the cached .venv by >2 GB.
+      - run: poetry run pip list --format=freeze | grep -i '^nvidia-' | cut -d= -f1 | xargs -r poetry run pip uninstall -y
+      - run: poetry run pip uninstall -y triton || true
+
+      - run: poetry run pytest --cov-fail-under=100
 
       - name: Extract coverage percentage
         id: coverage

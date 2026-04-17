@@ -33,9 +33,18 @@ variables:
       fi
     - export PATH="$CI_PROJECT_DIR/.poetry-home/bin:$PATH"
     - poetry install --no-root --with dev
-    # PyPI serves CUDA-enabled torch on Linux (~821 MB + ~1.8 GB of nvidia-* libs).
-    # CI has no GPU, so replace with the CPU-only wheel to shrink the venv cache.
-    - poetry run pip install torch --force-reinstall --index-url https://download.pytorch.org/whl/cpu
+    # PyPI's Linux torch/torchvision wheels are CUDA-enabled (~2.6 GB) so local
+    # GPU devs get CUDA by default. CI has no GPU — swap both to the CPU wheels
+    # at the same lockfile versions (keeps autogluon's `torch<2.10` happy, no
+    # version drift). Torchvision must be reinstalled in the same call: its C
+    # extension is built against a specific torch ABI and breaks otherwise.
+    - TORCH_VERSION=$(grep -A1 '^name = "torch"' poetry.lock | grep version | cut -d'"' -f2)
+    - TORCHVISION_VERSION=$(grep -A1 '^name = "torchvision"' poetry.lock | grep version | cut -d'"' -f2)
+    - poetry run pip install "torch==${TORCH_VERSION}+cpu" "torchvision==${TORCHVISION_VERSION}+cpu" --force-reinstall --index-url https://download.pytorch.org/whl/cpu
+    # Purge orphaned CUDA libs (nvidia-*, triton) left behind by the swap above —
+    # pip has no dep GC, so they'd otherwise bloat the cached .venv by >2 GB.
+    - poetry run pip list --format=freeze | grep -i '^nvidia-' | cut -d= -f1 | xargs -r poetry run pip uninstall -y
+    - poetry run pip uninstall -y triton || true
   tags:
     - kvm_runner_1
 
@@ -127,7 +136,8 @@ poetry_lock:
     - poetry check --lock
 
 
-# Run unit tests on MRs (fast); full suite on main
+# Run the full test suite on every MR and on main. No skipped markers, no
+# branching — auto-merge can't slip past a failing e2e/integration test.
 test:
   extends: .python_base
   stage: test
@@ -135,12 +145,7 @@ test:
     - main
     - merge_request
   script:
-    - |
-      if [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        poetry run pytest -m "not e2e and not integration"
-      else
-        poetry run pytest --cov-fail-under=100
-      fi
+    - poetry run pytest --cov-fail-under=100
     - echo "✓ All tests passed"
   artifacts:
     when: always
