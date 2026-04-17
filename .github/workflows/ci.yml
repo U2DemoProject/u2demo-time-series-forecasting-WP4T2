@@ -138,10 +138,22 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
 
-      # --extras cpu routes torch through pyproject.toml's pytorch-cpu source,
-      # so we never download the CUDA wheel on CI. End users installing from
-      # PyPI still get the default CUDA build.
-      - run: poetry install --no-root --with dev --extras cpu
+      - run: poetry install --no-root --with dev
+
+      # PyPI's Linux torch wheel is CUDA-enabled (~2.6 GB) so local GPU devs get
+      # CUDA by default. CI has no GPU — swap to the CPU wheel at the same lockfile
+      # version (keeps autogluon's `torch<2.10` happy, no version drift).
+      - name: Get torch version from lock file
+        id: torch-version
+        run: |
+          VERSION=$(grep -A1 '^name = "torch"' poetry.lock | grep version | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: poetry run pip install "torch==${{ steps.torch-version.outputs.version }}+cpu" --force-reinstall --index-url https://download.pytorch.org/whl/cpu
+
+      # Purge orphaned CUDA libs (nvidia-*, triton) left behind by the swap above —
+      # pip has no dep GC, so they'd otherwise bloat the cached .venv by >2 GB.
+      - run: poetry run pip list --format=freeze | grep -i '^nvidia-' | cut -d= -f1 | xargs -r poetry run pip uninstall -y
+      - run: poetry run pip uninstall -y triton || true
 
       - run: poetry run pytest --cov-fail-under=100
 
