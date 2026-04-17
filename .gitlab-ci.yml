@@ -33,14 +33,11 @@ variables:
       fi
     - export PATH="$CI_PROJECT_DIR/.poetry-home/bin:$PATH"
     - poetry install --no-root --with dev
-    # PyPI's Linux torch/torchvision wheels are CUDA-enabled (~2.6 GB) so local
-    # GPU devs get CUDA by default. CI has no GPU — swap both to the CPU wheels
-    # at the same lockfile versions (keeps autogluon's `torch<2.10` happy, no
-    # version drift). Torchvision must be reinstalled in the same call: its C
-    # extension is built against a specific torch ABI and breaks otherwise.
+    # PyPI's Linux torch wheel is CUDA-enabled (~2.6 GB) so local GPU devs get
+    # CUDA by default. CI has no GPU — swap to the CPU wheel at the same lockfile
+    # version (keeps autogluon's `torch<2.10` happy, no version drift).
     - TORCH_VERSION=$(grep -A1 '^name = "torch"' poetry.lock | grep version | cut -d'"' -f2)
-    - TORCHVISION_VERSION=$(grep -A1 '^name = "torchvision"' poetry.lock | grep version | cut -d'"' -f2)
-    - poetry run pip install "torch==${TORCH_VERSION}+cpu" "torchvision==${TORCHVISION_VERSION}+cpu" --force-reinstall --index-url https://download.pytorch.org/whl/cpu
+    - poetry run pip install "torch==${TORCH_VERSION}+cpu" --force-reinstall --index-url https://download.pytorch.org/whl/cpu
     # Purge orphaned CUDA libs (nvidia-*, triton) left behind by the swap above —
     # pip has no dep GC, so they'd otherwise bloat the cached .venv by >2 GB.
     - poetry run pip list --format=freeze | grep -i '^nvidia-' | cut -d= -f1 | xargs -r poetry run pip uninstall -y
