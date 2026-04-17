@@ -46,6 +46,9 @@ dependencies = [
     "pydantic-settings (>=2.0,<3.0)",
 ]
 
+[project.optional-dependencies]
+cpu = ["torch (>=2.2,<3.0)"]
+
 [project.urls]
 Homepage = "https://u2demo.eu/"
 Repository = "https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2"
@@ -59,6 +62,21 @@ u2demo-forecast = "u2demo_time_series_forecasting.cli:main"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+# PyPI's Linux torch wheel ships CUDA (~2.6 GB) so default installs — including
+# `pip install` from PyPI — give end users GPU support out of the box. The `cpu`
+# extra routes torch to PyTorch's CPU wheel index instead; used by CI where
+# there's no GPU and the runner can't fit the CUDA wheel.
+[tool.poetry.dependencies]
+torch = [
+    { version = ">=2.2,<3.0", markers = "extra != 'cpu'" },
+    { version = ">=2.2,<3.0", source = "pytorch-cpu", markers = "extra == 'cpu'" },
+]
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
 
 [dependency-groups]
 dev = [
