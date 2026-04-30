@@ -19,6 +19,7 @@ Models can be trained using hourly or daily timestep frequency.
 
 ## Contents
 
+- [Project structure](#project-structure)
 - [Install](#install)
 - [Use](#use)
   - [Input format](#input-format)
@@ -32,6 +33,34 @@ Models can be trained using hourly or daily timestep frequency.
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Project structure
+
+```
+.
+├── u2demo_time_series_forecasting/   # main package
+│   ├── cli.py                        # CLI entry point (u2demo-forecast)
+│   ├── train.py                      # training logic
+│   ├── predict.py                    # inference logic
+│   ├── data_models.py                # Pydantic input/output models
+│   ├── metadata.py                   # model metadata read/write
+│   ├── features/                     # feature engineering
+│   │   ├── pipeline.py
+│   │   ├── temporal.py
+│   │   ├── lag.py
+│   │   ├── holidays.py
+│   │   └── weather.py
+│   └── constants/                    # env vars, column names, paths
+├── data/                             # example input JSON files
+├── models/                           # trained models (written by train)
+├── output/                           # forecast JSON results (written by predict)
+├── tests/                            # test suite
+├── examples/                         # Jupyter notebooks
+├── scripts/                          # utility scripts
+├── Dockerfile
+├── docker-compose.yml
+└── pyproject.toml
+```
 
 ## Install
 
@@ -56,6 +85,31 @@ poetry install --with examples
 ```
 
 ## Use
+
+The application has two main operations — **train** and **predict** — that share the same feature engineering pipeline:
+
+```mermaid
+flowchart TD
+    subgraph train["Train"]
+        A["ForecastTrainingInput JSON"] --> FE["Feature Engineering
+        temporal · lag · holiday · weather"]
+        FE --> AG["AutoGluon
+        TimeSeriesPredictor.fit()"]
+        AG --> M[("Trained Model
+        models/&lt;id&gt;_&lt;version&gt;/")]
+    end
+
+    subgraph predict["Predict"]
+        B["ForecastInput JSON"] --> FE2["Same Feature Pipeline
+        (replayed from model metadata)"]
+        M -->|"loaded by
+        model_id + version"| FE2
+        FE2 --> AG2["AutoGluon
+        TimeSeriesPredictor.predict()"]
+        AG2 --> O["Forecast JSON
+        output/&lt;id&gt;_&lt;version&gt;_&lt;date&gt;.json"]
+    end
+```
 
 ### Input format
 
@@ -164,6 +218,44 @@ from u2demo_time_series_forecasting import train, predict, ForecastTrainingInput
 The data models (`ForecastTrainingInput`, `ForecastInput`, `Forecast`) accept the same JSON structure shown above. See the [example notebooks](examples/) for usage.
 
 ## Docker
+
+Two services are defined — a CPU service and a GPU variant that extends it. All bind mounts are relative to the project root on the host:
+
+```mermaid
+graph LR
+    subgraph host["Host filesystem"]
+        data["./data/"]
+        models["./models/"]
+        output["./output/"]
+    end
+
+    subgraph compose["Docker Compose"]
+        cpu["u2demo-time-series-forecasting
+        CPU"]
+        gpu["u2demo-time-series-forecasting-gpu
+        CPU + GPU"]
+        cache[("cache 
+        named volume")]
+        gpu -- extends --> cpu
+    end
+
+    subgraph ext["External APIs"]
+        nager["Nager.Date
+        holidays"]
+        openmeteo["Open-Meteo
+        weather"]
+        nominatim["Nominatim
+        geocoding"]
+    end
+
+    data <-- bind --> cpu
+    models <-- bind --> cpu
+    output <-- bind --> cpu
+    cache <-- volume --> cpu
+    cpu --> nager
+    cpu --> openmeteo
+    cpu --> nominatim
+```
 
 To build a Docker image, use the provided `build.sh` script. It builds the image from the committed `requirements.txt` (kept up-to-date by the `poetry-export` pre-commit hook). Pass `--latest` to also tag as `latest`:
 
