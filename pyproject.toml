@@ -81,6 +81,9 @@ optional = true
 [tool.poetry.group.examples]
 optional = true
 
+[tool.poetry.dependencies]
+lightning = {path = "vendor/lightning"}
+
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
 
