@@ -3,6 +3,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# lightning was removed from PyPI (security issue). Pre-install the local
+# compatibility stub so pip finds it satisfied when processing requirements.txt.
+COPY vendor/lightning/ /tmp/lightning-stub/
+RUN pip install --no-cache-dir /tmp/lightning-stub/ && rm -rf /tmp/lightning-stub/
+
 # Install deps first — this layer is cached across source-only changes.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
