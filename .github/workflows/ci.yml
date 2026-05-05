@@ -138,13 +138,6 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('poetry.lock') }}
 
-      # lightning was removed from PyPI due to a security vulnerability.
-      # autogluon-timeseries requires it, but only uses lightning.pytorch which
-      # is identical to pytorch-lightning. Pre-install our local stub so Poetry
-      # finds lightning already satisfied and skips the PyPI download entirely.
-      - name: Pre-install lightning compatibility stub
-        run: poetry run pip install vendor/lightning/ --force-reinstall --no-deps
-
       - run: poetry install --no-root --with dev
 
       # PyPI's Linux torch wheel is CUDA-enabled (~2.6 GB) so local GPU devs get
