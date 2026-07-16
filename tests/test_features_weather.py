@@ -465,11 +465,15 @@ class TestOpenMeteoAPISchema:
 
     def test_forecast_api_response_has_expected_fields(self):
         """Forecast API should return hourly data with the requested variables."""
+        # Use dates relative to today so the request always falls inside the
+        # forecast API's supported window (a fixed date eventually goes stale
+        # and the endpoint returns 400 for dates too far in the past).
+        today = dt.date.today()
         params = {
             "latitude": 48.7758,
             "longitude": 9.1829,
-            "start_date": "2026-04-10",
-            "end_date": "2026-04-11",
+            "start_date": today.isoformat(),
+            "end_date": (today + dt.timedelta(days=1)).isoformat(),
             "hourly": "temperature_2m",
             "timezone": "UTC",
         }
