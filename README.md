@@ -68,24 +68,19 @@ Requires **Python 3.12** (`>=3.12, <3.13`). GPU is optional but recommended for 
 
 This repo uses [Poetry](https://python-poetry.org/docs/#installing-with-the-official-installer) version **2.3.2**
 
-> **Note:** `autogluon-timeseries` depends on the `lightning` package, which was removed from PyPI due to a security vulnerability. A local compatibility stub is included at `vendor/lightning/`. You must pre-install it before running `poetry install`, otherwise the dependency resolver will fail.
-
 ```sh
-pip install vendor/lightning/
 poetry install
 ```
 
 To install dev tools:
 
 ```sh
-pip install vendor/lightning/
 poetry install --with dev
 ```
 
 To run the [example notebooks](examples/), install the optional `examples` group:
 
 ```sh
-pip install vendor/lightning/
 poetry install --with examples
 ```
 
