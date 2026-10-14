@@ -49,7 +49,9 @@ class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     model_id: str = Field(..., description="Unique identifier for this model instance.")
-    model_preset: str | None = Field(default="chronos2", description="AutoGluon preset (e.g. 'chronos2', 'fast_training', 'high_quality').")
+    model_preset: str | None = Field(
+        default="chronos2", description="AutoGluon preset (e.g. 'chronos2', 'fast_training', 'high_quality')."
+    )
     model_version: str | None = Field(default=None, description="Version identifier for the model (e.g., '1.0.0').")
     training_split: TrainingSplit = Field(
         default_factory=TrainingSplit, description="Train/validation/test split configuration."
