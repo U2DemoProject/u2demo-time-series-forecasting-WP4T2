@@ -13,7 +13,7 @@ This is the output of the forecasting algorithms developed in task 4.2. It is th
 
 Models trained with this application will contain custom metadata that is relevant to the specific nature of the U2Demo project. This metadata will be read automatically when performing inference using this application. This ensures that new data will only be accepted by models that were trained on sufficiently similarly-shaped training data.
 
-Models can be trained on any regular timestep frequency, including sub-hourly ones (e.g. 15 minutes). Hourly weather data is aligned to each sub-hourly step. Benchmarks so far (Deliverable D2.2) used hourly and daily data, so sub-hourly models have not been validated yet.
+Models can be trained on any regular timestep frequency, including sub-hourly ones (e.g. 15 minutes). Hourly weather data is aligned to each sub-hourly step.
 
 > This document has been produced in the context of the U2Demo project. Views and opinions expressed in this document are however those of the authors only and do not necessarily reflect those of the European Union or the European Climate, Infrastructure and Environment Executive Agency (CINEA). Neither the European Union nor the granting authority can be held responsible for them. U2Demo has received funding from the European Union's Horizon Europe programme under grant agreement no. 101160684.
 
