@@ -149,11 +149,17 @@ class TestModelConfig:
 
     def test_defaults(self):
         mc = ModelConfig(model_id="test")
-        assert mc.model_preset == "Chronos2Model"
+        assert mc.model_preset == "chronos2"
         assert mc.model_version is None
         assert mc.lookback_steps is None
         assert mc.eval_metric is None
         assert mc.quantile_levels is None
+
+    def test_default_preset_is_valid_autogluon_preset(self):
+        from autogluon.timeseries.configs import get_predictor_presets
+
+        mc = ModelConfig(model_id="test")
+        assert mc.model_preset in get_predictor_presets()
 
     def test_missing_model_id_rejects(self):
         with pytest.raises(ValidationError):

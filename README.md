@@ -7,13 +7,13 @@
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/jsantana-eifer/f303865e7600632d173a60147aa9abfe/raw/coverage.json)](https://github.com/U2DemoProject/u2demo-time-series-forecasting-wp4t2/actions/workflows/ci.yml)
 
-Train and run inference on time-series forecasting models using [AutoGluon](https://auto.gluon.ai/), with automatic feature engineering (temporal, lag, holiday, weather) for hourly or daily data.
+Train and run inference on time-series forecasting models using [AutoGluon](https://auto.gluon.ai/), with automatic feature engineering (temporal, lag, holiday, weather) for regularly sampled data (e.g. 15-minute, hourly or daily).
 
 This is the output of the forecasting algorithms developed in task 4.2. It is the source code for the time series forecasting algorithm used in the U2Demo project. It is used to train models for the forecasting of time series and perform inference on them.
 
 Models trained with this application will contain custom metadata that is relevant to the specific nature of the U2Demo project. This metadata will be read automatically when performing inference using this application. This ensures that new data will only be accepted by models that were trained on sufficiently similarly-shaped training data.
 
-Models can be trained using hourly or daily timestep frequency.
+Models can be trained on any regular timestep frequency, including sub-hourly ones (e.g. 15 minutes). Hourly weather data is aligned to each sub-hourly step. Benchmarks so far (Deliverable D2.2) used hourly and daily data, so sub-hourly models have not been validated yet.
 
 > This document has been produced in the context of the U2Demo project. Views and opinions expressed in this document are however those of the authors only and do not necessarily reflect those of the European Union or the European Climate, Infrastructure and Environment Executive Agency (CINEA). Neither the European Union nor the granting authority can be held responsible for them. U2Demo has received funding from the European Union's Horizon Europe programme under grant agreement no. 101160684.
 
@@ -145,7 +145,7 @@ Training payload structure (see [`data/dummy_train.json`](data/dummy_train.json)
 
 `training_values` must contain enough data points so that the time series length is at least `lookback_steps + horizon + max(lag)`. The exact minimum depends on your `model_config.lookback_steps`, `time_parameters.horizon_hours`, and `num_weekly_lags`.
 
-`model_preset` maps to AutoGluon's [`presets`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.fit.html) argument. Common values: `"fast_training"` (quick statistical/tree models), `"medium_quality"` (adds deep learning), `"high_quality"` (best accuracy, slowest). When omitted, the default is `"Chronos2Model"` (Chronos-2 zero-shot only).
+`model_preset` maps to AutoGluon's [`presets`](https://auto.gluon.ai/stable/api/autogluon.timeseries.TimeSeriesPredictor.fit.html) argument. Common values: `"fast_training"` (quick statistical/tree models), `"medium_quality"` (adds deep learning), `"high_quality"` (best accuracy, slowest). Single-model presets such as `"chronos2"` skip model selection. When omitted, the default is `"chronos2"` (Chronos-2 zero-shot only).
 
 The `features` list controls which feature engineering steps run. To train fully offline (no calls to Nager.Date, Open-Meteo, or Nominatim), use `["temporal", "lag"]` and omit `location`.
 
