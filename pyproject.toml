@@ -1,6 +1,6 @@
 [project]
 name = "u2demo-time-series-forecasting"
-version = "1.0.1"
+version = "1.0.2"
 description = "Time Series Forecasting Algorithm Implementation for U2Demo Project"
 authors = [
     {name = "Isaac Boates",email = "isaac.boates@eifer.org"},
