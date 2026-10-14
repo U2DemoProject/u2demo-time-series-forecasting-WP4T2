@@ -6,6 +6,7 @@ Covers validation boundaries, required fields, type coercion, and serialization 
 from datetime import UTC, datetime
 
 import pytest
+from autogluon.timeseries.configs import get_predictor_presets
 from pydantic import ValidationError
 
 from u2demo_time_series_forecasting.data_models import (
@@ -156,8 +157,6 @@ class TestModelConfig:
         assert mc.quantile_levels is None
 
     def test_default_preset_is_valid_autogluon_preset(self):
-        from autogluon.timeseries.configs import get_predictor_presets
-
         mc = ModelConfig(model_id="test")
         assert mc.model_preset in get_predictor_presets()
 
