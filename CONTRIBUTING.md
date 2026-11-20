@@ -97,10 +97,12 @@ When contributing a bug fix, please include a regression test. When adding a fea
 
 ```
 u2demo_time_series_forecasting/
-├── __init__.py      # Public API (train, predict, data models, FeatureName, ModelMetadata)
+├── __init__.py      # Public API (train, predict, v1 and v2 data models, FeatureName, ModelMetadata)
 ├── _version.py      # Single __version__ source
 ├── cli.py           # `u2demo-forecast` command-line entry point (see [project.scripts] in pyproject.toml)
-├── data_models.py   # Pydantic v2 external I/O models
+├── data_models.py   # Pydantic external I/O models (U2Demo data models v1)
+├── data_models_v2.py  # Pydantic external I/O models (U2Demo data models v2) and their v1 conversion
+├── versioning.py    # Data model version detection and validation of raw payloads
 ├── dataset.py       # DataFrame loading, validation, feature engineering
 ├── metadata.py      # ModelMetadata / TrainingMetadata (persisted alongside the model)
 ├── model.py         # AutoGluon TimeSeriesPredictor wrapper
