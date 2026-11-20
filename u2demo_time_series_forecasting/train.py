@@ -1,14 +1,17 @@
 import os
+from typing import Any
 
 from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
 from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
 from u2demo_time_series_forecasting.constants.training import DEFAULT_TRAIN_EVAL_METRIC, DEFAULT_TRAIN_MIN_LOOKBACK
 from u2demo_time_series_forecasting.data_models import ForecastTrainingInput
+from u2demo_time_series_forecasting.data_models_v2 import ForecastTrainingInputV2
 from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.names import FeatureName
 from u2demo_time_series_forecasting.features.pipeline import apply_features
 from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
 from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
+from u2demo_time_series_forecasting.versioning import PayloadVersion, parse_training_payload
 
 
 def train(
@@ -105,3 +108,55 @@ def train(
         save_leaderboards=True,
         training_kwargs=training_kwargs,
     )
+
+
+def train_v2(data: ForecastTrainingInputV2) -> None:
+    """
+    Train a new U2Demo time-series forecasting model from a v2 training request.
+
+    The request is converted with ``ForecastTrainingInputV2.to_v1()`` and trained by ``train``, so the model can
+    be used by v1 and v2 forecast requests alike.
+
+    Parameters
+    ----------
+    data : ForecastTrainingInputV2
+        The v2 training request.
+
+    Returns
+    -------
+    None
+        Trained model artifacts are saved to disk under ``MODEL_DIR``.
+
+    """
+    train(data.to_v1())
+
+
+def train_from_payload(payload: dict[str, Any], version: PayloadVersion | None = None) -> None:
+    """
+    Train a new U2Demo time-series forecasting model from a raw training payload of either data model version.
+
+    Parameters
+    ----------
+    payload : dict[str, Any]
+        The decoded JSON training request.
+    version : {"v1", "v2"}, optional
+        Data model version of the payload. Detected from the payload when omitted.
+
+    Returns
+    -------
+    None
+        Trained model artifacts are saved to disk under ``MODEL_DIR``.
+
+    Raises
+    ------
+    ValueError
+        If ``version`` is unknown, or if it is omitted and the payload mixes v1 and v2 fields.
+    pydantic.ValidationError
+        If the payload does not match the data model of its version.
+
+    """
+    data = parse_training_payload(payload, version)
+    if isinstance(data, ForecastTrainingInputV2):
+        train_v2(data)
+    else:
+        train(data)

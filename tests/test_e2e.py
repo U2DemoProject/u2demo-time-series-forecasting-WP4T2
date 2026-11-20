@@ -6,15 +6,20 @@ Mark: @pytest.mark.e2e — excluded from default test runs.
 """
 
 import tempfile
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from tests.conftest import make_v2_forecast_payload, make_v2_training_payload, v2_validator
 from u2demo_time_series_forecasting.constants.columns import TIME_SERIES_PREDICT_VALUE_COLUMN_NAME
 from u2demo_time_series_forecasting.data_models import ForecastInput, ForecastTrainingInput
+from u2demo_time_series_forecasting.data_models_v2 import ForecastInputV2, ForecastTrainingInputV2
 from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
+from u2demo_time_series_forecasting.predict import predict, predict_v2
+from u2demo_time_series_forecasting.train import train, train_v2
 from u2demo_time_series_forecasting.utils import get_known_covariates, get_min_timeseries_length
 
 # ── helpers ──────────────────────────────────────────────────────────────────────
@@ -220,3 +225,66 @@ class TestEndToEndPipeline:
             assert model2.metadata.frequency == "h"
             assert model2.metadata.horizon == horizon
             assert model2.metadata.min_timeseries_length == max(lags) + min_lookback + horizon
+
+
+@pytest.mark.e2e
+class TestCrossVersionPipeline:
+    """A model trained from a request of one data model version serves forecast requests of the other."""
+
+    periods = 200
+
+    @pytest.fixture(autouse=True)
+    def _model_dir(self, tmp_path):
+        with (
+            patch("u2demo_time_series_forecasting.train.MODEL_DIR", tmp_path),
+            patch("u2demo_time_series_forecasting.predict.MODEL_DIR", tmp_path),
+        ):
+            yield
+
+    def _values(self):
+        return np.random.default_rng(42).random(self.periods).tolist()
+
+    def _v2_values(self):
+        dates = pd.date_range(start="2023-01-01", periods=self.periods, freq="h", tz="UTC")
+        return [{"timestamp": ts.isoformat(), "value": v} for ts, v in zip(dates, self._values(), strict=True)]
+
+    def test_train_v1_then_predict_v2(self):
+        train(
+            _make_training_input(
+                periods=self.periods,
+                features=["temporal"],
+                lookback_steps=50,
+                values=self._values(),
+                quantile_levels=[0.1, 0.5, 0.9],
+            )
+        )
+        payload = make_v2_forecast_payload(model_id="test-e2e", target_series={"historical_values": self._v2_values()})
+
+        forecast = predict_v2(ForecastInputV2.model_validate(payload))
+
+        v2_validator("api/components/forecast/ForecastPayloadDM.json").validate(forecast.model_dump(mode="json"))
+        values = forecast.hasForecastSeries[0].hasValues
+        assert len(values) == 24
+        assert all(v.quantiles is not None and set(v.quantiles) == {"0.1", "0.5", "0.9"} for v in values)
+        assert all(np.isfinite(v.hasResult.numericValue) for v in values)
+
+    def test_train_v2_then_predict_v1(self):
+        payload = make_v2_training_payload(
+            features=["temporal"],
+            preferences={
+                "model_id": "test-e2e",
+                "model_preset": "chronos2",
+                "lookback_steps": 50,
+                "quantile_levels": [0.1, 0.5, 0.9],
+                "training_split": {"num_val_windows": 1, "num_test_windows": 1},
+            },
+            target_series={"training_values": self._v2_values()},
+        )
+        train_v2(ForecastTrainingInputV2.model_validate(payload))
+
+        forecast = predict(_make_forecast_input(periods=self.periods, values=self._values()))
+
+        values = forecast.forecast_series.values
+        assert len(values) == 24
+        assert all(v.quantiles is not None and set(v.quantiles) == {"0.1", "0.5", "0.9"} for v in values)
+        assert all(np.isfinite(v.value) for v in values)
