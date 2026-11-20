@@ -451,6 +451,8 @@ forecast = predict_from_payload(payload, version="v2")
 
 `train_from_payload` is the training counterpart, `detect_payload_version(payload)` returns `"v1"` or `"v2"`, and `forecast_to_v2(forecast, request)` converts a v1 `Forecast` to a `ForecastV2`.
 
+[`examples/household_consumption_v2.ipynb`](examples/household_consumption_v2.ipynb) trains a model and forecasts with v2 payloads in a notebook, on the same household data as the v1 notebook.
+
 ### Not covered
 
 - `ForecastedConnectionSession` (predicted EV arrival and departure times, with quantiles) is the forecast of an event, not a time series, and the v2 data models have no JSON schema for it yet.
