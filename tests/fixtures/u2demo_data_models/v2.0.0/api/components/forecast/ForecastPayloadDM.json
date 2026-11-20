@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/api/components/forecast/ForecastPayloadDM.json",
+  "title": "ForecastPayload",
+  "description": "A forecast attached to an asset. Projection of ForecastDM: run provenance and forecast preferences are platform-side records, and the time parameters are the request's `hasTimeParameters`.",
+  "type": "object",
+  "properties": {
+    "forecastId": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastDM.json#/properties/forecastId"
+    },
+    "forecast_date": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastDM.json#/properties/forecast_date"
+    },
+    "forecast_type": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/UserForecastPreferencesDM.json#/properties/forecast_type"
+    },
+    "hasForecastSeries": {
+      "type": "array",
+      "items": {
+        "$ref": "https://u2demo.eu/schema/v2.0.0/api/components/forecast/ForecastSeriesPayloadDM.json"
+      },
+      "minItems": 1
+    }
+  },
+  "required": ["forecastId", "hasForecastSeries"],
+  "additionalProperties": false
+}

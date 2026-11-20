@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/metering/QuantityValueDM.json",
+  "title": "QuantityValue",
+  "description": "The result of an observation or a forecast: a number and the unit it is expressed in.",
+  "type": "object",
+  "properties": {
+    "numericValue": {
+      "type": "number",
+      "description": "Numeric value of the quantity."
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of measure as a QUDT unit IRI, e.g. unit:KiloW, unit:KiloW-HR, unit:DEG_C."
+    }
+  },
+  "required": ["numericValue", "unit"],
+  "additionalProperties": false
+}

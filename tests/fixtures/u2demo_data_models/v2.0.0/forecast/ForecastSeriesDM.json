@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json",
+  "title": "ForecastSeries",
+  "description": "One predicted variable for one subject, over the horizon. Names the variable, binds it to the subject it describes (hasFeatureOfInterest), and declares the unit as a symbol and as a QUDT IRI.",
+  "type": "object",
+  "properties": {
+    "series_id": {
+      "type": "string",
+      "description": "Unique identifier of this series within the forecast."
+    },
+    "variable_name": {
+      "type": "string",
+      "description": "Name of the forecast variable. Should resolve to a sosa:ObservableProperty named individual."
+    },
+    "model_id": {
+      "type": "string",
+      "description": "Identifier of the trained model that produced this series."
+    },
+    "asset_type": {
+      "type": "string",
+      "description": "Type of the asset, carried for convenience. Present only when the feature of interest is an asset."
+    },
+    "unit_symbol": {
+      "type": "string",
+      "description": "Human-readable unit symbol (e.g. kW, kWh, °C)."
+    },
+    "unit": {
+      "type": "string",
+      "description": "QUDT unit IRI for the same unit, as on QuantityValue (e.g. unit:KiloW)."
+    },
+    "hasValues": {
+      "type": "array",
+      "items": {
+        "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastedValueDM.json"
+      },
+      "description": "The ordered predicted values of this series. Unconstrained by minItems (see OrderDM.json's hasTimeStepOrders for the same reasoning): ForecastedValue.isValueOf is the required inverse of this field, so a minItems:1 constraint here would form an infinite cycle with no finite JSON instance - the top-level series always has real values in practice; only the series nested inside ForecastedValue.isValueOf legitimately has none."
+    },
+    "hasFeatureOfInterest": {
+      "oneOf": [
+        {
+          "$ref": "https://u2demo.eu/schema/v2.0.0/assets/AssetDM.json"
+        },
+        {
+          "$ref": "https://u2demo.eu/schema/v2.0.0/metering/MeteringPointDM.json"
+        },
+        {
+          "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/SiteDM.json"
+        },
+        {
+          "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/FacilityDM.json"
+        },
+        {
+          "$ref": "https://u2demo.eu/schema/v2.0.0/market/MarketDM.json"
+        }
+      ],
+      "description": "The subject whose property is predicted: an Asset, a MeteringPoint, a Site or a Facility (as on Observation), or a Market for a price forecast."
+    },
+    "observedProperty": {
+      "type": "string",
+      "enum": [
+        "ActivePower",
+        "ReactivePower",
+        "ApparentPower",
+        "ChargePower",
+        "DischargePower",
+        "DCPower",
+        "MPPPower",
+        "PowerFactor",
+        "ChargeEnergy",
+        "DischargeEnergy",
+        "EnergyYield",
+        "MPPEnergy",
+        "ImportEnergy",
+        "ExportEnergy",
+        "Voltage",
+        "DCVoltage",
+        "Current",
+        "DCCurrent",
+        "Frequency",
+        "BESSTemperature",
+        "SupplyTemperature",
+        "ReturnTemperature",
+        "DHWTemperature",
+        "IndoorTemperature",
+        "OutdoorTemperature",
+        "StateOfCharge",
+        "StateOfHealth",
+        "PhaseAActivePower",
+        "PhaseBActivePower",
+        "PhaseCActivePower",
+        "PhaseAVoltage",
+        "PhaseBVoltage",
+        "PhaseCVoltage",
+        "PhaseACurrent",
+        "PhaseBCurrent",
+        "PhaseCCurrent",
+        "PhaseAPowerFactor",
+        "PhaseBPowerFactor",
+        "PhaseCPowerFactor",
+        "PhaseAFrequency",
+        "PhaseBFrequency",
+        "PhaseCFrequency",
+        "Humidity",
+        "Irradiance",
+        "ClearedPrice",
+        "ClearedVolume",
+        "OrderPrice",
+        "OrderVolume",
+        "InjectionPrice",
+        "OfftakePrice",
+        "InternalPrice"
+      ],
+      "description": "The quantity predicted, from the shared observable property vocabulary."
+    }
+  },
+  "required": [
+    "series_id",
+    "hasValues",
+    "hasFeatureOfInterest",
+    "observedProperty"
+  ],
+  "additionalProperties": false
+}

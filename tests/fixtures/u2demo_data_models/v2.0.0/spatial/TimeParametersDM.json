@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/spatial/TimeParametersDM.json",
+  "title": "TimeParameters",
+  "description": "The temporal frame of an algorithm run: how long a timestep is, how far ahead to look, and when the run is scheduled.",
+  "type": "object",
+  "properties": {
+    "timeParametersId": {
+      "type": "string",
+      "description": "Unique identifier."
+    },
+    "timestep_minutes": {
+      "type": "integer",
+      "description": "Length of one timestep, in minutes."
+    },
+    "horizon_hours": {
+      "type": "integer",
+      "description": "Length of the optimisation or forecast horizon, in hours."
+    },
+    "scheduling_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time at which the optimisation / scheduling is executed."
+    },
+    "hasActor": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/ActorDM.json",
+      "description": "Actor these parameters belong to, where actor-specific."
+    },
+    "relatedToOptimizationInstance": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/optimisation/OptimizationInstanceDM.json",
+      "description": "Run these parameters apply to."
+    }
+  },
+  "required": ["timeParametersId", "relatedToOptimizationInstance"],
+  "additionalProperties": false
+}

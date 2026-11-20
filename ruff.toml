@@ -65,6 +65,8 @@ convention = "numpy"
 
 [lint.extend-per-file-ignores]
 "**/__init__.py" = ["D"]
+# Field names follow the camelCase of the U2Demo data models v2 JSON schemas
+"u2demo_time_series_forecasting/data_models_v2.py" = ["N815"]
 "tests/test_*.py" = ["D", "ANN001", "ANN201", "ANN202", "ARG001", "ARG002", "ARG005", "S101", "S108", "RUF043", "RUF059"]
 "scripts/*.py" = ["T20"]
 

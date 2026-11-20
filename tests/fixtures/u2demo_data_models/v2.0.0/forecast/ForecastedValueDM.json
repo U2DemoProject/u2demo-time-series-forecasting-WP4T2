@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastedValueDM.json",
+  "title": "ForecastedValue",
+  "description": "A single predicted value at a single timestep. For a stochastic forecast, value is the point estimate and quantiles carries the distribution.",
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestep the value refers to."
+    },
+    "quantiles": {
+      "type": "object",
+      "description": "Map of quantile level to predicted value, present when forecast_type = STOCHASTIC. Keys are quantile levels (e.g. 0.1, 0.5, 0.9)."
+    },
+    "observedProperty": {
+      "type": "string",
+      "enum": [
+        "ActivePower",
+        "ReactivePower",
+        "ApparentPower",
+        "ChargePower",
+        "DischargePower",
+        "DCPower",
+        "MPPPower",
+        "PowerFactor",
+        "ChargeEnergy",
+        "DischargeEnergy",
+        "EnergyYield",
+        "MPPEnergy",
+        "ImportEnergy",
+        "ExportEnergy",
+        "Voltage",
+        "DCVoltage",
+        "Current",
+        "DCCurrent",
+        "Frequency",
+        "BESSTemperature",
+        "SupplyTemperature",
+        "ReturnTemperature",
+        "DHWTemperature",
+        "IndoorTemperature",
+        "OutdoorTemperature",
+        "StateOfCharge",
+        "StateOfHealth",
+        "PhaseAActivePower",
+        "PhaseBActivePower",
+        "PhaseCActivePower",
+        "PhaseAVoltage",
+        "PhaseBVoltage",
+        "PhaseCVoltage",
+        "PhaseACurrent",
+        "PhaseBCurrent",
+        "PhaseCCurrent",
+        "PhaseAPowerFactor",
+        "PhaseBPowerFactor",
+        "PhaseCPowerFactor",
+        "PhaseAFrequency",
+        "PhaseBFrequency",
+        "PhaseCFrequency",
+        "Humidity",
+        "Irradiance",
+        "ClearedPrice",
+        "ClearedVolume",
+        "OrderPrice",
+        "OrderVolume",
+        "InjectionPrice",
+        "OfftakePrice",
+        "InternalPrice"
+      ],
+      "description": "The quantity predicted. Drawn from the shared observable property vocabulary (electrical, thermal, environmental or price)."
+    },
+    "hasResult": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/metering/QuantityValueDM.json",
+      "description": "Predicted value and its unit."
+    },
+    "isValueOf": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json",
+      "description": "Series this value belongs to."
+    }
+  },
+  "required": ["timestamp", "observedProperty", "hasResult", "isValueOf"],
+  "additionalProperties": false
+}
