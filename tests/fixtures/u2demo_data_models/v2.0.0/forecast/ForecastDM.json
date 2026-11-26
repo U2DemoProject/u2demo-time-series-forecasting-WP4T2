@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastDM.json",
+  "title": "Forecast",
+  "description": "The result of a forecasting run: a dated set of identified time series, each series predicting one variable for one subject over the horizon.",
+  "type": "object",
+  "properties": {
+    "forecastId": {
+      "type": "string",
+      "description": "Unique identifier of the forecast."
+    },
+    "forecast_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time at which the forecast was produced."
+    },
+    "hasTimeParameters": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/TimeParametersDM.json",
+      "description": "Timestep, horizon and scheduling time the forecast is produced for."
+    },
+    "hasForecastSeries": {
+      "type": "array",
+      "items": {
+        "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json"
+      },
+      "minItems": 1,
+      "description": "The individual predicted series returned by this run."
+    },
+    "hasUserForecastPreferences": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/UserForecastPreferencesDM.json",
+      "description": "Forecasting configuration chosen by the actor this forecast was produced for."
+    },
+    "producedByRun": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/optimisation/OptimizationInstanceDM.json",
+      "description": "The forecasting run that produced this forecast."
+    }
+  },
+  "required": [
+    "forecastId",
+    "hasTimeParameters",
+    "hasForecastSeries",
+    "hasUserForecastPreferences",
+    "producedByRun"
+  ],
+  "additionalProperties": false
+}

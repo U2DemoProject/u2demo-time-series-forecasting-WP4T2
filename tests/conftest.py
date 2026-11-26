@@ -4,6 +4,9 @@ import json
 import os
 import tempfile
 from collections.abc import Generator
+from functools import cache
+from pathlib import Path
+from unittest.mock import MagicMock
 
 # CI only: pin HF_HOME to /tmp so model downloads never enter cached paths.
 # Must run at import time, before `transformers` / `huggingface_hub` reads it.
@@ -14,6 +17,9 @@ if os.environ.get("CI"):
 import numpy as np
 import pandas as pd
 import pytest
+from jsonschema import Draft7Validator
+from referencing import Registry, Resource
+from referencing.exceptions import NoSuchResource
 
 from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
@@ -21,6 +27,11 @@ from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_TIMESTAMP_COLUMN_NAME,
 )
 from u2demo_time_series_forecasting.data_models import ForecastTrainingInput
+from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
+
+DATA_DIR = Path(__file__).parent.parent / "data"
+V2_SCHEMA_BASE_URI = "https://u2demo.eu/schema/v2.0.0/"
+V2_SCHEMA_DIR = Path(__file__).parent / "fixtures" / "u2demo_data_models" / "v2.0.0"
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +113,256 @@ def load_training_input_from_json(json_path: str) -> ForecastTrainingInput:
     with open(json_path) as f:
         raw_data = json.load(f)
     return ForecastTrainingInput(**raw_data)
+
+
+def v2_schema(path: str) -> dict:
+    """
+    Load a vendored U2Demo data models v2 schema.
+
+    Parameters
+    ----------
+    path : str
+        Path of the schema under ``v2.0.0/`` (e.g. ``"forecast/ForecastSeriesDM.json"``).
+
+    Returns
+    -------
+    dict
+        The JSON schema.
+
+    """
+    return json.loads((V2_SCHEMA_DIR / path).read_text())
+
+
+def _retrieve_v2_schema(uri: str) -> Resource:
+    """Resolve a ``https://u2demo.eu/schema/v2.0.0/<path>`` reference to the vendored schema at ``<path>``."""
+    if not uri.startswith(V2_SCHEMA_BASE_URI):
+        raise NoSuchResource(ref=uri)
+    return Resource.from_contents(v2_schema(uri.removeprefix(V2_SCHEMA_BASE_URI)))
+
+
+@cache
+def v2_validator(path: str) -> Draft7Validator:
+    """
+    Build a validator for a vendored v2 schema, with ``$ref`` resolved against the vendored schemas.
+
+    ``date-time`` formats are checked, so timestamps without a UTC offset are rejected.
+
+    Parameters
+    ----------
+    path : str
+        Path of the schema under ``v2.0.0/`` (e.g. ``"api/components/forecast/ForecastPayloadDM.json"``).
+
+    Returns
+    -------
+    Draft7Validator
+        The validator.
+
+    """
+    return Draft7Validator(
+        v2_schema(path),
+        registry=Registry(retrieve=_retrieve_v2_schema),
+        format_checker=Draft7Validator.FORMAT_CHECKER,
+    )
+
+
+def _v2_values(periods: int, timestep_minutes: int) -> list[dict]:
+    dates = pd.date_range(start="2023-01-01", periods=periods, freq=f"{timestep_minutes}min", tz="UTC")
+    return [{"timestamp": ts.isoformat(), "value": float(i)} for i, ts in enumerate(dates)]
+
+
+def make_v2_training_payload(
+    periods: int = 200,
+    timestep_minutes: int = 60,
+    preferences: dict | None = None,
+    has_time_parameters: dict | None = None,
+    target_series: dict | None = None,
+    **overrides: object,
+) -> dict:
+    """
+    Build a v2 training payload (``ForecastTrainingInputV2``) with UTC values from 2023-01-01.
+
+    Parameters
+    ----------
+    periods : int
+        Number of training values.
+    timestep_minutes : int
+        Spacing of the training values, also set in ``hasTimeParameters``.
+    preferences : dict, optional
+        Fields merged into ``hasUserForecastPreferences``.
+    has_time_parameters : dict, optional
+        Fields merged into ``hasTimeParameters``.
+    target_series : dict, optional
+        Fields merged into ``target_series``.
+    **overrides : object
+        Top-level fields replacing the defaults.
+
+    Returns
+    -------
+    dict
+        The payload.
+
+    """
+    payload: dict = {
+        "hasTimeParameters": {"timestep_minutes": timestep_minutes, "horizon_hours": 24, **(has_time_parameters or {})},
+        "hasUserForecastPreferences": {
+            "forecast_type": "STOCHASTIC",
+            "model_id": "test-model",
+            "model_version": "1.0.0",
+            "model_preset": "fast_training",
+            **(preferences or {}),
+        },
+        "target_series": {
+            "series_id": "s1",
+            "observedProperty": "ActivePower",
+            "hasFeatureOfInterest": "pv1",
+            "asset_type": "PV",
+            "unit_symbol": "kW",
+            "training_values": _v2_values(periods, timestep_minutes),
+            **(target_series or {}),
+        },
+    }
+    payload.update(overrides)
+    return payload
+
+
+def make_v2_forecast_payload(
+    periods: int = 200,
+    timestep_minutes: int = 60,
+    has_time_parameters: dict | None = None,
+    target_series: dict | None = None,
+    **overrides: object,
+) -> dict:
+    """
+    Build a v2 forecast payload (``ForecastInputV2``) with UTC values from 2023-01-01.
+
+    Parameters
+    ----------
+    periods : int
+        Number of historical values.
+    timestep_minutes : int
+        Spacing of the historical values, also set in ``hasTimeParameters``.
+    has_time_parameters : dict, optional
+        Fields merged into ``hasTimeParameters``.
+    target_series : dict, optional
+        Fields merged into ``target_series``.
+    **overrides : object
+        Top-level fields replacing the defaults.
+
+    Returns
+    -------
+    dict
+        The payload.
+
+    """
+    payload: dict = {
+        "forecast_type": "STOCHASTIC",
+        "hasTimeParameters": {"timestep_minutes": timestep_minutes, "horizon_hours": 24, **(has_time_parameters or {})},
+        "model_id": "test-model",
+        "model_version": "1.0.0",
+        "target_series": {
+            "series_id": "s1",
+            "observedProperty": "ActivePower",
+            "hasFeatureOfInterest": "pv1",
+            "asset_type": "PV",
+            "unit_symbol": "kW",
+            "historical_values": _v2_values(periods, timestep_minutes),
+            **(target_series or {}),
+        },
+    }
+    payload.update(overrides)
+    return payload
+
+
+def make_model_metadata(
+    freq: str = "h",
+    prediction_length: int = 24,
+    added_columns: dict | None = None,
+    lags: list[int] | None = None,
+    windows: list[int] | None = None,
+) -> ModelMetadata:
+    """
+    Build the metadata of a trained model.
+
+    Parameters
+    ----------
+    freq : str
+        Frequency of the model.
+    prediction_length : int
+        Forecast horizon in steps.
+    added_columns : dict, optional
+        Engineered feature columns, by feature name.
+    lags : list[int], optional
+        Lags of the lag features.
+    windows : list[int], optional
+        Windows of the rolling-stat features.
+
+    Returns
+    -------
+    ModelMetadata
+        The metadata, with a minimum series length of 50.
+
+    """
+    return ModelMetadata(
+        version="0.1.0",
+        frequency=freq,
+        horizon=prediction_length,
+        min_timeseries_length=50,
+        added_columns=added_columns or {},
+        lags=lags or [],
+        windows=windows or [],
+        training=TrainingMetadata(
+            start_utc="2023-01-01 00:00:00",
+            end_utc="2023-01-01 00:01:00",
+            min_lookback=50,
+            num_val_windows=1,
+            num_test_windows=1,
+        ),
+    )
+
+
+def make_mock_model(freq: str = "h", prediction_length: int = 24, metadata: ModelMetadata | None = None) -> MagicMock:
+    """
+    Build a mock of a loaded ``U2TimeSeriesForecastingModel``.
+
+    Its forecast has a mean of 1.0 and quantiles 0.1, 0.5 and 0.9 of 0.5, 1.0 and 1.5.
+
+    Parameters
+    ----------
+    freq : str
+        Frequency of the model.
+    prediction_length : int
+        Forecast horizon in steps.
+    metadata : ModelMetadata, optional
+        Metadata of the model; built from ``freq`` and ``prediction_length`` when omitted.
+
+    Returns
+    -------
+    MagicMock
+        The mock model.
+
+    """
+    mock_model = MagicMock()
+    mock_model.metadata = metadata or make_model_metadata(freq=freq, prediction_length=prediction_length)
+    mock_model.freq = freq
+    mock_model.prediction_length = prediction_length
+    mock_model.quantile_levels = [0.1, 0.5, 0.9]
+
+    future_dates = pd.date_range("2023-01-09T08:00:00", periods=prediction_length, freq=freq)
+    index = pd.MultiIndex.from_arrays(
+        [[0] * prediction_length, future_dates],
+        names=["item_id", "timestamp"],
+    )
+    pred_df = pd.DataFrame(
+        {
+            "mean": [1.0] * prediction_length,
+            "0.1": [0.5] * prediction_length,
+            "0.5": [1.0] * prediction_length,
+            "0.9": [1.5] * prediction_length,
+        },
+        index=index,
+    )
+    mock_model.predict.return_value = pred_df
+    return mock_model
 
 
 # ── fixtures ───────────────────────────────────────────────────────────────────

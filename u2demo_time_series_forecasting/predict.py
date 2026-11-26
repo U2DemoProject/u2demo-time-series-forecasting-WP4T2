@@ -1,5 +1,6 @@
 import os
 from datetime import UTC, datetime
+from typing import Any
 
 from u2demo_time_series_forecasting.constants.columns import (
     TIME_SERIES_GROUP_COLUMN_NAME,
@@ -8,9 +9,11 @@ from u2demo_time_series_forecasting.constants.columns import (
 )
 from u2demo_time_series_forecasting.constants.paths import MODEL_DIR
 from u2demo_time_series_forecasting.data_models import Forecast, ForecastedTimeValue, ForecastInput, ForecastSeries
+from u2demo_time_series_forecasting.data_models_v2 import ForecastInputV2, ForecastV2, forecast_to_v2
 from u2demo_time_series_forecasting.dataset import U2TimeSeriesForecastingDataset
 from u2demo_time_series_forecasting.features.pipeline import apply_features
 from u2demo_time_series_forecasting.model import U2TimeSeriesForecastingModel
+from u2demo_time_series_forecasting.versioning import PayloadVersion, parse_forecast_payload
 
 
 def predict(data: ForecastInput) -> Forecast:
@@ -118,3 +121,60 @@ def predict(data: ForecastInput) -> Forecast:
             values=forecasts,
         ),
     )
+
+
+def predict_v2(data: ForecastInputV2) -> ForecastV2:
+    """
+    Run the forecasting pipeline on a v2 forecast request.
+
+    The request is converted with ``ForecastInputV2.to_v1()``, forecast by ``predict``, and the result is converted
+    with ``forecast_to_v2``. Models trained from v1 and from v2 requests can both be used.
+
+    Parameters
+    ----------
+    data : ForecastInputV2
+        The v2 forecast request.
+
+    Returns
+    -------
+    ForecastV2
+        The forecast as a v2 ``ForecastPayloadDM``.
+
+    Raises
+    ------
+    ValueError
+        In the same cases as ``predict``.
+
+    """
+    return forecast_to_v2(predict(data.to_v1()), data)
+
+
+def predict_from_payload(payload: dict[str, Any], version: PayloadVersion | None = None) -> Forecast | ForecastV2:
+    """
+    Run the forecasting pipeline on a raw forecast payload of either data model version.
+
+    Parameters
+    ----------
+    payload : dict[str, Any]
+        The decoded JSON forecast request.
+    version : {"v1", "v2"}, optional
+        Data model version of the payload. Detected from the payload when omitted.
+
+    Returns
+    -------
+    Forecast or ForecastV2
+        The forecast, in the version of the request.
+
+    Raises
+    ------
+    ValueError
+        If ``version`` is unknown, if it is omitted and the payload mixes v1 and v2 fields, or in the same
+        cases as ``predict``.
+    pydantic.ValidationError
+        If the payload does not match the data model of its version.
+
+    """
+    data = parse_forecast_payload(payload, version)
+    if isinstance(data, ForecastInputV2):
+        return predict_v2(data)
+    return predict(data)

@@ -8,10 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
+from tests.conftest import make_mock_model, make_v2_forecast_payload, v2_validator
 from u2demo_time_series_forecasting.data_models import Forecast, ForecastInput, Location
-from u2demo_time_series_forecasting.metadata import ModelMetadata, TrainingMetadata
-from u2demo_time_series_forecasting.predict import predict
+from u2demo_time_series_forecasting.data_models_v2 import ForecastInputV2, ForecastTypeV2, ForecastV2
+from u2demo_time_series_forecasting.predict import predict, predict_from_payload, predict_v2
 
 
 def _make_forecast_input(periods=200, horizon_hours=24, model_id="test-model", model_version="1.0.0"):
@@ -34,53 +36,6 @@ def _make_forecast_input(periods=200, horizon_hours=24, model_id="test-model", m
     )
 
 
-def _make_metadata(freq="h", prediction_length=24, added_columns=None, lags=None, windows=None):
-    """Build a ModelMetadata instance matching a trained model."""
-    return ModelMetadata(
-        version="0.1.0",
-        frequency=freq,
-        horizon=prediction_length,
-        min_timeseries_length=50,
-        added_columns=added_columns or {},
-        lags=lags or [],
-        windows=windows or [],
-        training=TrainingMetadata(
-            start_utc="2023-01-01 00:00:00",
-            end_utc="2023-01-01 00:01:00",
-            min_lookback=50,
-            num_val_windows=1,
-            num_test_windows=1,
-        ),
-    )
-
-
-def _make_mock_model(freq="h", prediction_length=24, metadata=None):
-    """Build a mock model that looks like a loaded U2TimeSeriesForecastingModel."""
-    mock_model = MagicMock()
-    mock_model.metadata = metadata or _make_metadata(freq=freq, prediction_length=prediction_length)
-    mock_model.freq = freq
-    mock_model.prediction_length = prediction_length
-    mock_model.quantile_levels = [0.1, 0.5, 0.9]
-
-    # Build realistic forecast output
-    future_dates = pd.date_range("2023-01-09T08:00:00", periods=prediction_length, freq=freq)
-    index = pd.MultiIndex.from_arrays(
-        [[0] * prediction_length, future_dates],
-        names=["item_id", "timestamp"],
-    )
-    pred_df = pd.DataFrame(
-        {
-            "mean": [1.0] * prediction_length,
-            "0.1": [0.5] * prediction_length,
-            "0.5": [1.0] * prediction_length,
-            "0.9": [1.5] * prediction_length,
-        },
-        index=index,
-    )
-    mock_model.predict.return_value = pred_df
-    return mock_model
-
-
 @pytest.mark.unit
 class TestPredictOrchestration:
     """Tests for predict function orchestration logic."""
@@ -88,7 +43,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_returns_forecast_object(self, mock_model_cls):
         """predict should return a Forecast data model."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -99,7 +54,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_forecast_has_correct_series_metadata(self, mock_model_cls):
         """Forecast series should carry through target_series metadata."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -113,7 +68,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_forecast_has_correct_length(self, mock_model_cls):
         """Forecast should have horizon_hours / freq_hours values."""
-        mock_model = _make_mock_model(prediction_length=24)
+        mock_model = make_mock_model(prediction_length=24)
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(horizon_hours=24)
@@ -124,7 +79,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_forecast_includes_quantiles(self, mock_model_cls):
         """Each forecasted value should include quantile forecasts."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -139,7 +94,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_model_loaded_from_correct_path(self, mock_model_cls):
         """Model should be loaded from MODEL_PATH/model_id_model_version."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(model_id="my-model", model_version="2.0.0")
@@ -166,7 +121,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_raises_when_freq_minutes_not_initialized(self, mock_model_cls, mock_dataset_cls):
         """predict should raise when the dataset exposes freq_minutes=None."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         mock_dataset = MagicMock()
@@ -182,7 +137,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_frequency_mismatch_raises(self, mock_model_cls):
         """Frequency mismatch between model and data should raise ValueError."""
-        mock_model = _make_mock_model(freq="D", prediction_length=24)
+        mock_model = make_mock_model(freq="D", prediction_length=24)
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -193,7 +148,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_horizon_mismatch_raises(self, mock_model_cls):
         """Horizon mismatch between request and model should raise ValueError."""
-        mock_model = _make_mock_model(prediction_length=48)
+        mock_model = make_mock_model(prediction_length=48)
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(horizon_hours=24)
@@ -204,7 +159,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_temporal_features_applied_when_in_metadata(self, mock_model_cls):
         """When temporal is in model metadata, add_temporal should be called."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"temporal": ["month_sin"]}
         mock_model_cls.return_value = mock_model
 
@@ -216,7 +171,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_forecast_type_preserved(self, mock_model_cls):
         """Forecast type from input should be preserved in output."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -227,7 +182,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_lag_features_applied_when_in_metadata(self, mock_model_cls):
         """When lag is in model metadata, add_lags should be called."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"lag": ["lag_168", "roll_mean_168"]}
         mock_model.metadata.lags = [168]
         mock_model.metadata.windows = [168]
@@ -241,7 +196,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_holiday_features_applied_when_in_metadata(self, mock_model_cls, monkeypatch):
         """When holiday is in model metadata, add_holidays should be called."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"holiday": ["holiday_public"]}
         mock_model_cls.return_value = mock_model
 
@@ -259,7 +214,7 @@ class TestPredictOrchestration:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_weather_features_applied_when_in_metadata(self, mock_model_cls, monkeypatch):
         """When weather is in model metadata, add_weather should be called."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"weather": ["temperature_2m"]}
         mock_model_cls.return_value = mock_model
 
@@ -286,7 +241,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_mean_column_renamed_to_value(self, mock_model_cls):
         """The 'mean' column from AG output should become 'value' in forecast."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -298,7 +253,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_timestamps_formatted_as_iso_strings(self, mock_model_cls):
         """Timestamps in forecast should be ISO-formatted strings."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -310,7 +265,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_quantile_dict_keys_are_strings(self, mock_model_cls):
         """Quantile keys should be string representations of quantile levels."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.quantile_levels = [0.1, 0.5, 0.9]
         mock_model_cls.return_value = mock_model
 
@@ -323,7 +278,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_quantile_values_match_mock_output(self, mock_model_cls):
         """Quantile values should be correctly mapped from the forecast DataFrame."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -337,7 +292,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_series_metadata_carried_through(self, mock_model_cls):
         """Target series metadata (unit, unitIri, etc.) should propagate to output."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -349,7 +304,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_time_parameters_carried_through(self, mock_model_cls):
         """Time parameters from input should be preserved in output Forecast."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input(horizon_hours=24)
@@ -361,7 +316,7 @@ class TestPredictTransformation:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_forecast_date_is_recent(self, mock_model_cls):
         """forecast_date should be a recent ISO datetime (not None or empty)."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model_cls.return_value = mock_model
 
         data = _make_forecast_input()
@@ -381,7 +336,7 @@ class TestFeatureReplaySymmetry:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_empty_metadata_skips_all_features(self, mock_model_cls):
         """When metadata has no added_columns, no feature engineering should run."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {}
         mock_model_cls.return_value = mock_model
 
@@ -394,7 +349,7 @@ class TestFeatureReplaySymmetry:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_temporal_only_replay(self, mock_model_cls):
         """When only temporal is in metadata, only temporal features should be applied."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"temporal": ["month_sin", "month_cos"]}
         mock_model_cls.return_value = mock_model
 
@@ -406,7 +361,7 @@ class TestFeatureReplaySymmetry:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_lag_replay_uses_metadata_lags_and_windows(self, mock_model_cls):
         """Lag feature replay should use lags and windows from metadata, not recalculate."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {"lag": ["lag_24", "roll_mean_24"]}
         mock_model.metadata.lags = [24]
         mock_model.metadata.windows = [24]
@@ -420,7 +375,7 @@ class TestFeatureReplaySymmetry:
     @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
     def test_combined_temporal_and_lag_replay(self, mock_model_cls):
         """When both temporal and lag are in metadata, both should be applied."""
-        mock_model = _make_mock_model()
+        mock_model = make_mock_model()
         mock_model.metadata.added_columns = {
             "temporal": ["month_sin"],
             "lag": ["lag_24", "roll_mean_24"],
@@ -433,3 +388,99 @@ class TestFeatureReplaySymmetry:
         result = predict(data)
 
         assert isinstance(result, Forecast)
+
+
+@pytest.mark.unit
+class TestPredictV2:
+    """Tests for predict_v2: v2 requests run through predict and come back as ForecastPayloadDM."""
+
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_returns_forecast_v2(self, mock_model_cls):
+        mock_model_cls.return_value = make_mock_model()
+
+        result = predict_v2(ForecastInputV2.model_validate(make_v2_forecast_payload(forecastId="forecast-1")))
+
+        assert isinstance(result, ForecastV2)
+        assert result.forecastId == "forecast-1"
+        assert result.forecast_type is ForecastTypeV2.STOCHASTIC
+        series = result.hasForecastSeries[0]
+        assert series.hasFeatureOfInterest == "pv1"
+        assert series.model_id == "test-model_1.0.0"
+        assert len(series.hasValues) == 24
+        assert series.hasValues[0].hasResult.numericValue == 1.0
+        assert series.hasValues[0].quantiles == {"0.1": 0.5, "0.5": 1.0, "0.9": 1.5}
+
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_model_loaded_from_model_id_and_version(self, mock_model_cls):
+        mock_model_cls.return_value = make_mock_model()
+
+        predict_v2(ForecastInputV2.model_validate(make_v2_forecast_payload(model_id="my-model", model_version="2.0.0")))
+
+        assert mock_model_cls.call_args[0][0].endswith("my-model_2.0.0")
+
+    @pytest.mark.parametrize(("forecast_type", "has_quantiles"), [("STOCHASTIC", True), ("DETERMINISTIC", False)])
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_output_validates_against_forecast_payload_schema(self, mock_model_cls, forecast_type, has_quantiles):
+        mock_model_cls.return_value = make_mock_model()
+
+        result = predict_v2(ForecastInputV2.model_validate(make_v2_forecast_payload(forecast_type=forecast_type)))
+
+        payload = result.model_dump(mode="json")
+        v2_validator("api/components/forecast/ForecastPayloadDM.json").validate(payload)
+        assert ("quantiles" in payload["hasForecastSeries"][0]["hasValues"][0]) is has_quantiles
+
+    @pytest.mark.parametrize("offset", ["+00:00", "+01:00"])
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_exogenous_series_with_offset_timestamps(self, mock_model_cls, offset):
+        mock_model_cls.return_value = make_mock_model()
+        dates = pd.date_range(start="2023-01-01", periods=224, freq="h")
+        values = [{"timestamp": f"{ts.isoformat()}{offset}", "value": 10.0} for ts in dates]
+        payload = make_v2_forecast_payload(
+            target_series={"historical_values": [{**v, "value": 1.0} for v in values[:200]]},
+            exogenous_series=[
+                {
+                    "series_id": "t1",
+                    "observedProperty": "OutdoorTemperature",
+                    "historical_values": values[:200],
+                    "future_values": values[200:],
+                }
+            ],
+        )
+
+        result = predict_v2(ForecastInputV2.model_validate(payload))
+
+        assert len(result.hasForecastSeries[0].hasValues) == 24
+        dataset = mock_model_cls.return_value.predict.call_args[0][0]
+        assert dataset.future_df["OutdoorTemperature"].tolist() == [10.0] * 24
+
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_horizon_mismatch_raises(self, mock_model_cls):
+        mock_model_cls.return_value = make_mock_model(prediction_length=48)
+
+        with pytest.raises(ValueError, match="horizon"):
+            predict_v2(ForecastInputV2.model_validate(make_v2_forecast_payload()))
+
+
+@pytest.mark.unit
+class TestPredictFromPayload:
+    """Tests for predict_from_payload: the forecast is returned in the version of the request."""
+
+    @pytest.mark.parametrize(
+        ("payload", "expected_type"),
+        [
+            (_make_forecast_input().model_dump(mode="json"), Forecast),
+            (make_v2_forecast_payload(), ForecastV2),
+        ],
+    )
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_forecast_in_version_of_request(self, mock_model_cls, payload, expected_type):
+        mock_model_cls.return_value = make_mock_model()
+
+        assert isinstance(predict_from_payload(payload), expected_type)
+
+    @patch("u2demo_time_series_forecasting.predict.U2TimeSeriesForecastingModel")
+    def test_explicit_version_validates_against_that_version(self, mock_model_cls):
+        mock_model_cls.return_value = make_mock_model()
+
+        with pytest.raises(ValidationError):
+            predict_from_payload(make_v2_forecast_payload(), version="v1")

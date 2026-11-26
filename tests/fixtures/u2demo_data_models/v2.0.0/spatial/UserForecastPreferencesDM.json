@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/spatial/UserForecastPreferencesDM.json",
+  "title": "UserForecastPreferences",
+  "description": "The forecasting configuration an actor has chosen: which forecast type, model preset and version, and training parameters applied when a model is retrained on their data.",
+  "type": "object",
+  "properties": {
+    "ufpId": {
+      "type": "string",
+      "description": "Unique identifier."
+    },
+    "forecast_type": {
+      "type": "string",
+      "enum": ["DETERMINISTIC", "STOCHASTIC"],
+      "description": "Type of forecast model to train: deterministic (point) or stochastic (probabilistic)."
+    },
+    "model_preset": {
+      "type": "string",
+      "description": "ML algorithm or architecture preset."
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Version identifier for the model (e.g. '1.0.0')."
+    },
+    "training_ratio": {
+      "type": "number",
+      "description": "Fraction of data used for training (e.g. 0.70)."
+    },
+    "validation_ratio": {
+      "type": "number",
+      "description": "Fraction of data used for validation (e.g. 0.15)."
+    },
+    "test_ratio": {
+      "type": "number",
+      "description": "Fraction of data used for testing (e.g. 0.15)."
+    },
+    "lookback_steps": {
+      "type": "integer",
+      "description": "Number of past timesteps used as input features for the model."
+    },
+    "loss_function": {
+      "type": "string",
+      "description": "Loss function to optimize (e.g. 'mse', 'mae', 'pinball')."
+    },
+    "quantile_levels": {
+      "type": "array",
+      "items": { "type": "number" },
+      "description": "Quantile levels to predict (for quantile regression models)."
+    },
+    "hasActor": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/spatial/ActorDM.json",
+      "description": "Actor these preferences belong to."
+    },
+    "relatedToOptimizationInstance": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/optimisation/OptimizationInstanceDM.json",
+      "description": "Run these preferences were applied in."
+    }
+  },
+  "required": ["ufpId", "forecast_type", "hasActor"],
+  "additionalProperties": false
+}

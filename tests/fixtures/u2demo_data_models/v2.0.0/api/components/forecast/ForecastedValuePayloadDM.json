@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/api/components/forecast/ForecastedValuePayloadDM.json",
+  "title": "ForecastedValuePayload",
+  "description": "One forecasted value. Projection of ForecastedValueDM: `isValueOf` is implied by nesting in the series, and `observedProperty` is carried once by the series.",
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastedValueDM.json#/properties/timestamp"
+    },
+    "hasResult": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastedValueDM.json#/properties/hasResult"
+    },
+    "quantiles": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastedValueDM.json#/properties/quantiles"
+    }
+  },
+  "required": ["timestamp", "hasResult"],
+  "additionalProperties": false
+}

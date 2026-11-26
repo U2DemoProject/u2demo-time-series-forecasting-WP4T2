@@ -28,6 +28,8 @@ data/*
 !data/.gitkeep
 !data/dummy_train.json
 !data/dummy_predict.json
+!data/dummy_train_v2.json
+!data/dummy_predict_v2.json
 models/*
 !models/.gitkeep
 output/*

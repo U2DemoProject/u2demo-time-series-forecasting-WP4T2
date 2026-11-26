@@ -7,9 +7,12 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
+from tests.conftest import make_v2_training_payload
 from u2demo_time_series_forecasting.data_models import ForecastTrainingInput
-from u2demo_time_series_forecasting.train import train
+from u2demo_time_series_forecasting.data_models_v2 import ForecastTrainingInputV2
+from u2demo_time_series_forecasting.train import train, train_from_payload, train_v2
 
 
 def _make_training_input(
@@ -61,6 +64,12 @@ def _make_training_input(
         payload["training_model_config"]["excluded_model_types"] = excluded_model_types
 
     return ForecastTrainingInput(**payload)
+
+
+def _make_training_input_v2(periods=200, **preferences):
+    """Build a ForecastTrainingInputV2 with a 50-step lookback and the given preferences."""
+    payload = make_v2_training_payload(periods=periods, preferences={"lookback_steps": 50, **preferences})
+    return ForecastTrainingInputV2.model_validate(payload)
 
 
 @pytest.mark.unit
@@ -288,3 +297,74 @@ class TestTrainOrchestration:
         data = _make_training_input(periods=2000, features=["lag"], lookback_steps=50)
 
         train(data)
+
+
+@pytest.mark.unit
+class TestTrainV2:
+    """Tests for train_v2: v2 requests are trained as their v1 equivalent."""
+
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
+    def test_trains_converted_request(self, mock_model_cls):
+        mock_model = MagicMock()
+        mock_model_cls.return_value = mock_model
+
+        train_v2(_make_training_input_v2(loss_function="pinball", quantile_levels=[0.1, 0.5, 0.9]))
+
+        assert mock_model_cls.call_args[0][0].endswith("test-model_1.0.0")
+        new_kwargs = mock_model.new.call_args.kwargs
+        assert new_kwargs["eval_metric"] == "WQL"
+        assert new_kwargs["quantile_levels"] == [0.1, 0.5, 0.9]
+        assert new_kwargs["prediction_length"] == 24
+        train_kwargs = mock_model.train.call_args.kwargs
+        assert train_kwargs["min_lookback"] == 50
+        assert train_kwargs["training_kwargs"] == {"presets": "fast_training"}
+
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
+    def test_deterministic_trains_median(self, mock_model_cls):
+        mock_model = MagicMock()
+        mock_model_cls.return_value = mock_model
+
+        train_v2(_make_training_input_v2(forecast_type="DETERMINISTIC"))
+
+        assert mock_model.new.call_args.kwargs["quantile_levels"] == [0.5]
+
+    @patch("u2demo_time_series_forecasting.train.U2TimeSeriesForecastingModel")
+    def test_ratios_become_windows(self, mock_model_cls):
+        mock_model = MagicMock()
+        mock_model_cls.return_value = mock_model
+
+        train_v2(_make_training_input_v2(periods=480, validation_ratio=0.25, test_ratio=0.125))
+
+        train_kwargs = mock_model.train.call_args.kwargs
+        assert train_kwargs["num_val_windows"] == 5
+        assert train_kwargs["num_test_windows"] == 2
+
+
+@pytest.mark.unit
+class TestTrainFromPayload:
+    """Tests for train_from_payload: payloads of either version reach train as v1 input."""
+
+    @patch("u2demo_time_series_forecasting.train.train")
+    def test_v1_payload(self, mock_train):
+        payload = _make_training_input(features=[]).model_dump(mode="json", by_alias=True)
+
+        train_from_payload(payload)
+
+        data = mock_train.call_args[0][0]
+        assert isinstance(data, ForecastTrainingInput)
+        assert data.target_series.variable_name == "active_power"
+
+    @patch("u2demo_time_series_forecasting.train.train")
+    def test_v2_payload_is_converted(self, mock_train):
+        train_from_payload(make_v2_training_payload())
+
+        data = mock_train.call_args[0][0]
+        assert isinstance(data, ForecastTrainingInput)
+        assert data.target_series.variable_name == "ActivePower"
+        assert data.target_series.asset_id == "pv1"
+
+    @patch("u2demo_time_series_forecasting.train.train")
+    def test_explicit_version_validates_against_that_version(self, mock_train):
+        with pytest.raises(ValidationError):
+            train_from_payload(make_v2_training_payload(), version="v1")
+        mock_train.assert_not_called()

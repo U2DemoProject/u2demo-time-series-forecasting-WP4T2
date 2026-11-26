@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://u2demo.eu/schema/v2.0.0/api/components/forecast/ForecastSeriesPayloadDM.json",
+  "title": "ForecastSeriesPayload",
+  "description": "One forecasted time series. Projection of ForecastSeriesDM.",
+  "type": "object",
+  "properties": {
+    "series_id": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json#/properties/series_id"
+    },
+    "observedProperty": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json#/properties/observedProperty"
+    },
+    "hasFeatureOfInterest": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of the subject whose property is predicted: the `assetId` of the asset holding the series, or the `facilityId` of its facility for a facility-wide quantity such as the outdoor temperature. Reference form of `ForecastSeriesDM.hasFeatureOfInterest`."
+    },
+    "unit_symbol": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json#/properties/unit_symbol"
+    },
+    "unit": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json#/properties/unit"
+    },
+    "model_id": {
+      "$ref": "https://u2demo.eu/schema/v2.0.0/forecast/ForecastSeriesDM.json#/properties/model_id"
+    },
+    "hasValues": {
+      "type": "array",
+      "items": {
+        "$ref": "https://u2demo.eu/schema/v2.0.0/api/components/forecast/ForecastedValuePayloadDM.json"
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "series_id",
+    "observedProperty",
+    "hasFeatureOfInterest",
+    "hasValues"
+  ],
+  "additionalProperties": false
+}
